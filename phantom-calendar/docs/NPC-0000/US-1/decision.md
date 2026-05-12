@@ -1,1 +1,3 @@
 - 2026-05-12 — Decision: Initial state files created for US-1 (Project Scaffold). Impact: requirements.txt, .gitignore, tests/smoke_imports.py, tests/__init__.py.
+- 2026-05-12 — Decision: Expanded existing .gitignore (which only had .DS_Store and credentials.json) to add all AC1.2-required exclusions. Did not recreate from scratch to preserve any intent in the original file.
+- 2026-05-12 — Decision: smoke_imports.py uses __import__() to allow programmatic iteration over the package list rather than bare import statements, keeping the failure reporting DRY. Display names match the package names from requirements.txt; module names are the actual importable top-level packages.
