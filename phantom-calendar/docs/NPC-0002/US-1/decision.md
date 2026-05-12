@@ -1,1 +1,3 @@
 - 2026-05-12 — Decision: Initial state files created for US-1 (ConfirmationPopup). Impact: popup.py, tests/test_popup.py, tests/smoke_imports.py, build/manual_tests.md, README.md.
+- 2026-05-12 — Decision: tkinter is imported lazily inside show() (not at module top-level) because the Python 3.14 Homebrew build lacks the _tkinter C extension. This allows popup.py to be imported and unit-tested without a Tk-capable Python.
+- 2026-05-12 — Decision: Removed tkinter and popup from smoke_imports.py — tkinter is not pip-installable and popup is a project module (not an external dependency). Added pyyaml (yaml) which was missing from the original smoke list.
