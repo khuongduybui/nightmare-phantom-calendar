@@ -27,7 +27,7 @@ spec_hash: ''
 
 2. **Alarm event title**: `f"⏰ Alarm — {meeting_name}"` — includes the meeting name for human readability.
 
-3. **Alarm event duration**: 5 minutes (per feature.md AC2). End time = `alarm_time + timedelta(minutes=5)`.
+3. **Alarm event duration**: `prep_minutes` from the compute result — the alarm event fills the prep window and ends exactly when the meeting starts. End time = `alarm_time + timedelta(minutes=prep_minutes)`. `prep_minutes` is passed as a parameter by the caller alongside `meeting_name`.
 
 4. **Baseline override approach**:
    - Call `events().instances(calendarId=..., eventId=BASELINE_EVENT_ID, timeMin=..., timeMax=...)` to find tomorrow's occurrence.
@@ -36,14 +36,16 @@ spec_hash: ''
 
 5. **Timezone for API calls**: All `timeMin`/`timeMax` strings are ISO 8601 with timezone offset (from `config["timezone"]`), not UTC `Z` suffix — consistent with `calendar_reader.py`.
 
-6. **`meeting_name` source**: The caller (`sync_job.py` in NPC-0004) passes `meeting_name` separately. `run_calendar_write()` signature: `run_calendar_write(popup_response, config, meeting_name)`.
+6. **`meeting_name` and `prep_minutes` source**: The caller (`sync_job.py` in NPC-0004) passes both separately from the `compute_alarm()` result. `run_calendar_write()` signature: `run_calendar_write(popup_response, config, meeting_name, prep_minutes)`.
 
-7. **Mismatch with feature.md FR-4**: feature.md says title comes from `config["meeting_name"]`. This key does not exist in `drive_config.parse_config()` output. The correct source is the `compute_alarm()` result's `first_meeting_name`, passed by the caller. Spec: `meeting_name` is a parameter to `run_calendar_write()`.
+7. **Mismatch with feature.md FR-4**: feature.md says title comes from `config["meeting_name"]`. This key does not exist in `drive_config.parse_config()` output. The correct source is the `compute_alarm()` result's `first_meeting_name`, passed by the caller. Spec: `meeting_name` and `prep_minutes` are parameters to `run_calendar_write()`.
+
+8. **Mismatch with feature.md AC2 (5-minute duration)**: feature.md specifies a fixed 5-minute duration. Spec overrides this: duration = `prep_minutes` so the alarm event is back-to-back with the meeting (ends exactly at meeting start). Feature.md AC2 is superseded by this design decision.
 
 ### Mismatches vs. project.md Step 6
 
 - project.md uses UTC `Z` suffix for timeMin/timeMax — spec uses local tz ISO strings (consistent with existing `calendar_reader.py` pattern).
-- project.md event duration is 30 minutes — feature.md says 5 minutes. **Feature.md wins: 5 minutes.**
+- project.md event duration is 30 minutes — feature.md says 5 minutes — spec uses `prep_minutes` (back-to-back with meeting). **Spec overrides both.**
 - project.md `get_tomorrow_window()` uses `datetime.datetime` without timezone — spec uses tz-aware datetimes.
 
 ---
@@ -72,14 +74,14 @@ spec_hash: ''
 - AC1.2: `get_tomorrow_range(timezone_str: str) -> tuple[str, str]` returns `(start_iso, end_iso)` covering all of tomorrow in the given timezone, as ISO 8601 strings with timezone offset.
 - AC1.3: `get_existing_alarm_for_tomorrow(service, calendar_id: str, timezone_str: str) -> list[dict]` queries `events().list(calendarId=..., timeMin=..., timeMax=..., q=ALARM_TAG, singleEvents=True)` and returns the list of matching event dicts. Returns `[]` when none found.
 - AC1.4: `delete_alarm_event(service, calendar_id: str, event_id: str) -> None` calls `events().delete(calendarId=..., eventId=...)`.
-- AC1.5: `write_alarm_event(service, calendar_id: str, alarm_time: datetime, meeting_name: str, timezone_str: str) -> dict` creates an event with:
+- AC1.5: `write_alarm_event(service, calendar_id: str, alarm_time: datetime, meeting_name: str, timezone_str: str, prep_minutes: int) -> dict` creates an event with:
   - `summary`: `f"⏰ Alarm — {meeting_name}"`
   - `description`: `ALARM_TAG`
   - `start.dateTime`: `alarm_time.isoformat()`
   - `start.timeZone`: `timezone_str`
-  - `end.dateTime`: `(alarm_time + timedelta(minutes=5)).isoformat()`
+  - `end.dateTime`: `(alarm_time + timedelta(minutes=prep_minutes)).isoformat()`
   - `end.timeZone`: `timezone_str`
-  - Returns the created event dict.
+  - Returns the created event dict. The alarm event fills the prep window and ends exactly at meeting start.
 - AC1.6: No `datetime.utcnow()` calls. All datetimes are tz-aware.
 - AC1.7: `auth.py` not modified.
 
@@ -89,7 +91,7 @@ spec_hash: ''
 - `test_get_existing_alarm_returns_empty_list_when_none` — mock returns `{"items": []}`; assert `[]`.
 - `test_delete_alarm_event_calls_api` — assert `events().delete(calendarId=..., eventId=...)` called.
 - `test_write_alarm_event_correct_fields` — assert `summary`, `description`, `start`, `end` fields on inserted event.
-- `test_write_alarm_event_duration_5_minutes` — assert end = start + 5 min.
+- `test_write_alarm_event_duration_equals_prep_minutes` — assert end = start + prep_minutes (e.g. 30 min prep → 30 min event).
 
 **Dependencies:** None. Uses existing `auth.py`.
 
@@ -102,8 +104,8 @@ spec_hash: ''
 **Acceptance Criteria:**
 
 - AC2.1: `get_baseline_instance_for_tomorrow(service, calendar_id: str, baseline_event_id: str, timezone_str: str) -> dict | None` calls `events().instances(calendarId=..., eventId=baseline_event_id, timeMin=..., timeMax=..., maxResults=1)` and returns the first instance dict, or `None` if no instance found.
-- AC2.2: `override_baseline_occurrence(service, calendar_id: str, instance: dict, alarm_time: datetime, timezone_str: str) -> dict` updates the instance's `start` and `end` to `alarm_time` / `alarm_time + 5 min` and calls `events().update(calendarId=..., eventId=instance["id"], body=instance)`. Returns the updated event dict.
-- AC2.3: `run_calendar_write(popup_response: dict, config: dict, meeting_name: str) -> None`:
+- AC2.2: `override_baseline_occurrence(service, calendar_id: str, instance: dict, alarm_time: datetime, timezone_str: str, prep_minutes: int) -> dict` updates the instance's `start` to `alarm_time` and `end` to `alarm_time + prep_minutes` and calls `events().update(calendarId=..., eventId=instance["id"], body=instance)`. Returns the updated event dict.
+- AC2.3: `run_calendar_write(popup_response: dict, config: dict, meeting_name: str, prep_minutes: int) -> None`:
   - Returns immediately (no API calls) if `popup_response["skipped"]` is True. (feature.md AC8)
   - Returns immediately (no API calls) if `popup_response["confirmed"]` is False. (feature.md AC8)
   - Otherwise: calls `get_existing_alarm_for_tomorrow()`, deletes each found event, calls `write_alarm_event()`, and if `config.get("baseline_event_id")` is set, calls `get_baseline_instance_for_tomorrow()` and (if instance found) `override_baseline_occurrence()`. (feature.md AC1–AC5)

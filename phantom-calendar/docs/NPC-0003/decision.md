@@ -1,4 +1,4 @@
 - 2026-05-12 — Decision: Initial spec created for NPC-0003 (Calendar Writer). Two user stories: US-1 core write ops, US-2 baseline handling + orchestration.
-- 2026-05-12 — Decision: `meeting_name` is a parameter to `run_calendar_write()` rather than a config key. feature.md FR-4 references `config["meeting_name"]` which does not exist in the actual parse_config() output — the correct source is `compute_alarm()["first_meeting_name"]` passed by the caller.
-- 2026-05-12 — Decision: Alarm event duration is 5 minutes (feature.md AC2). project.md Step 6 uses 30 minutes — feature.md wins.
+- 2026-05-12 — Decision: `meeting_name` and `prep_minutes` are parameters to `run_calendar_write()` rather than config keys. feature.md FR-4 references `config["meeting_name"]` which does not exist in parse_config() output — correct sources are `compute_alarm()["first_meeting_name"]` and `compute_alarm()["prep_minutes"]` passed by the caller.
+- 2026-05-12 — Decision: Alarm event duration = `prep_minutes`, making it back-to-back with the meeting (ends exactly at meeting start). Overrides feature.md AC2 (5 min fixed) and project.md Step 6 (30 min fixed). More informative in the calendar.
 - 2026-05-12 — Decision: timeMin/timeMax use tz-aware ISO strings (not UTC Z suffix) to be consistent with calendar_reader.py.
