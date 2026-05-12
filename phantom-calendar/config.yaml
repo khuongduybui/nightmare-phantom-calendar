@@ -1,0 +1,41 @@
+calendars:
+  personal_id: duykbui1989@gmail.com
+  msi_id: duy.bui@motorolasolutions.com
+  daily_run_time: "19:00"
+
+timezone: America/New_York
+
+default_prep_minutes: 30
+
+baseline_event:
+  id: l13abvd0p0vkphit24u6bkhuf8
+  title: Daily Standup Alarm
+  time: "09:25"
+
+recurring_meetings:
+  - name: AERSS Standup
+    start: "09:30"
+    end: "09:45"
+    days: [Mon, Tue, Wed, Thu, Fri]
+    prep_minutes: 5
+    notes: Baseline recurring alarm
+  - name: Pod 8 Daily Sync
+    start: "12:30"
+    end: "12:45"
+    days: [Mon, Tue, Wed, Thu, Fri]
+    prep_minutes: 15
+    notes: Alarm at 12:15 if first meeting of day
+
+meeting_type_prep:
+  Daily standup: 5
+  Regular online meeting: 10
+  New platform (first use): 15
+  New client: 30
+  Interview: 30
+  In-person (local): travel+10
+  In-person (far): travel+15
+  Unknown: 30
+
+locations: {}
+
+client_overrides: {}
