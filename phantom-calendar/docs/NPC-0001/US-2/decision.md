@@ -1,0 +1,1 @@
+- 2026-05-12 — Decision: Initial state files created for US-2 (Calendar Reader Module). Impact: calendar_reader.py, tests/test_calendar_reader.py.

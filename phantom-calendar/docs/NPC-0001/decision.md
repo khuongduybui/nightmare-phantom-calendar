@@ -1,0 +1,3 @@
+- 2026-05-12 — Decision: spec.md authored by Planner for NPC-0001 (Decision Engine). Three user stories: US-1 drive_config.py, US-2 calendar_reader.py, US-3 compute.py. US-1 and US-2 parallelizable at source level.
+- 2026-05-12 — Decision: CONFIG_FILE_ID made configurable via PHANTOM_CONFIG_FILE_ID env var (overrides feature.md/project.md hardcoded value) to satisfy AC2.
+- 2026-05-12 — Decision: Spec approved by human. Rationale: All user stories reviewed and accepted. spec_hash: 46a663679694. Impact: docs/NPC-0001/spec.md approved; per-story state files updated.

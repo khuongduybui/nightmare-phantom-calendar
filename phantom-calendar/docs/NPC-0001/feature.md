@@ -73,3 +73,4 @@ sequenceDiagram
     Personal-->>Caller: List of events with titles
     Caller->>Compute: Match blocks + compute alarm
     Compute-->>Caller: Structured result
+```

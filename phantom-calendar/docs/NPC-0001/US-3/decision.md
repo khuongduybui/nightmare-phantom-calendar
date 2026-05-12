@@ -1,0 +1,1 @@
+- 2026-05-12 — Decision: Initial state files created for US-3 (Compute Module). Impact: compute.py, tests/test_compute.py.

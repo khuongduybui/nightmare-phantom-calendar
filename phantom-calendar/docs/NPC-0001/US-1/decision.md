@@ -1,0 +1,1 @@
+- 2026-05-12 — Decision: Initial state files created for US-1 (Drive Config Module). Impact: drive_config.py, tests/test_drive_config.py.
