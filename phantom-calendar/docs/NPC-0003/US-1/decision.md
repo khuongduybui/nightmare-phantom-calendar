@@ -1,0 +1,1 @@
+- 2026-05-12 — Decision: Initial state files created for US-1 (Core Write Operations). Impact: calendar_writer.py (partial), tests/test_calendar_writer.py (TestCoreWriteOps).

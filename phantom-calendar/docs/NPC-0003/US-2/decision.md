@@ -1,0 +1,1 @@
+- 2026-05-12 — Decision: Initial state files created for US-2 (Baseline Handling + Orchestration). Impact: calendar_writer.py (full), tests/test_calendar_writer.py (TestBaselineAndOrchestration).
