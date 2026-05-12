@@ -34,6 +34,43 @@ Complete all prerequisites before running each section.
 
 ---
 
+## NPC-0002 — Confirmation Popup
+
+### MT-2.11 — Popup appears in front and claims focus (AC1.11)
+
+**Feature:** NPC-0002 / US-1
+
+**Prerequisites:** NPC-0001 complete; valid `token.json` present; venv active.
+
+**Steps:**
+1. Open several other apps (browser, editor) so they cover the terminal.
+2. With venv active, from `phantom-calendar/`, trigger the popup manually:
+   ```fish
+   uv run python -c "
+   from datetime import date, datetime, timedelta
+   import pytz
+   from popup import ConfirmationPopup
+   tz = pytz.timezone('America/New_York')
+   d = date.today() + timedelta(days=1)
+   result = {
+     'first_meeting_name': 'Test Meeting',
+     'first_meeting_time': tz.localize(datetime(d.year, d.month, d.day, 9, 30)),
+     'prep_minutes': 10,
+     'alarm_time': tz.localize(datetime(d.year, d.month, d.day, 9, 20)),
+     'is_baseline': False,
+     'all_meetings': [],
+     'unknown_blocks': [],
+   }
+   print(ConfirmationPopup(result).show())
+   "
+   ```
+3. Observe whether the popup window appears above all other open windows.
+4. Observe whether the popup window has keyboard focus (you can type in the alarm field immediately without clicking).
+
+**Pass criteria:** Popup appears on top of all other windows; keyboard focus is on the popup immediately (alarm field is active or window title bar is highlighted).
+
+---
+
 ## NPC-0000 — Bootstrap
 
 ### MT-1.3 — Venv creation and dependency install (AC1.3)

@@ -9,6 +9,7 @@ PACKAGES = [
     ("google_auth_oauthlib", "google_auth_oauthlib"),
     ("apscheduler", "apscheduler"),
     ("pytz", "pytz"),
+    ("pyyaml", "yaml"),
 ]
 
 failed = False
