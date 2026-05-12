@@ -20,6 +20,20 @@ Complete all prerequisites before running each section.
 
 ---
 
+## NPC-0001 — Decision Engine
+
+### MT-1001.H2 — MSI calendar freeBusyReader access (H-2)
+
+**Feature:** NPC-0001
+
+**Steps:**
+1. Confirm `duy.bui@motorolasolutions.com` has granted the authenticated Google account at least `freeBusyReader` permission on the MSI Work calendar.
+2. With venv active, run a quick smoke: `uv run python -c "from calendar_reader import get_msi_time_blocks; print(get_msi_time_blocks())"` (requires valid `token.json`).
+
+**Pass criteria:** Returns a list (possibly empty) without raising a permissions error.
+
+---
+
 ## NPC-0000 — Bootstrap
 
 ### MT-1.3 — Venv creation and dependency install (AC1.3)

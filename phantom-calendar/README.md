@@ -80,7 +80,7 @@ bash build/tests.sh
 This script:
 - Verifies the venv is active
 - Runs `tests/smoke_imports.py` (confirms all packages importable)
-- Runs `pytest tests/` (5 unit tests covering auth lifecycle and graceful error handling)
+- Runs `pytest tests/` (37 unit tests covering auth, Drive config, calendar reading, and alarm computation)
 
 ### Manual tests
 
@@ -103,15 +103,22 @@ phantom-calendar/
 ├── auth.py               OAuth lifecycle (credentials, token, refresh)
 ├── app.py                macOS menu bar app (rumps)
 ├── main.py               Entry point
+├── drive_config.py       Google Drive config read/parse/bootstrap (YAML)
+├── calendar_reader.py    Reads MSI time blocks and Personal calendar events
+├── compute.py            Matches meetings and computes alarm time
+├── config.yaml           Default configuration (committed; auto-pushed to Drive)
 ├── requirements.txt      Pinned runtime dependencies
 ├── .gitignore            Excludes credentials.json, token.json, .venv/, etc.
 ├── build/
 │   ├── tests.sh          Run all automated tests
 │   └── manual_tests.md   Manual acceptance criteria
 └── tests/
-    ├── smoke_imports.py  Import smoke test
-    ├── test_auth.py      Auth module unit tests
-    └── test_main.py      Entry point unit tests
+    ├── smoke_imports.py      Import smoke test
+    ├── test_auth.py          Auth module unit tests
+    ├── test_main.py          Entry point unit tests
+    ├── test_drive_config.py  Drive config unit tests
+    ├── test_calendar_reader.py  Calendar reader unit tests
+    └── test_compute.py       Compute module unit tests
 ```
 
 ---
