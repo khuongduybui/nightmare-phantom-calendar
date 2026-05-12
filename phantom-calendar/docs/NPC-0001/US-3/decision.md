@@ -1,1 +1,3 @@
 - 2026-05-12 — Decision: Initial state files created for US-3 (Compute Module). Impact: compute.py, tests/test_compute.py.
+- 2026-05-12 — Decision: Extracted _is_baseline_alarm() as a private helper to keep compute_alarm() readable and the baseline-check logic independently testable.
+- 2026-05-12 — Decision: match_block_to_meeting() parses meeting start time as %H:%M (24h) only, matching the YAML config format. No AM/PM parsing needed since config.yaml uses 24h times.
