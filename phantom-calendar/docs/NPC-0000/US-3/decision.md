@@ -1,1 +1,4 @@
 - 2026-05-12 — Decision: Initial state files created for US-3 (Menu Bar App Stub). Impact: app.py, main.py, tests/test_main.py.
+- 2026-05-12 — Decision: app.py uses both `self.menu = [...]` in __init__ and `@rumps.clicked` decorator on run_now to satisfy AC3.4 (rumps.MenuItem in menu) while also correctly binding the callback via the decorator pattern rumps expects.
+- 2026-05-12 — Decision: main.py imports CREDENTIALS_FILE from auth.py to include the resolved path in the error message, giving the user an actionable file path without hardcoding it in main.py.
+- 2026-05-12 — Decision: test_main.py imports main inside the test method (after patches are active) to avoid module-level import side effects from rumps trying to connect to macOS AppKit at import time.

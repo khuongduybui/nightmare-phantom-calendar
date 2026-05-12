@@ -1,15 +1,17 @@
 ---
-phase: Implementer
+phase: Story-Review
 spec_hash: '77dde19595b0'
-status: NotStarted
-blockers: US-1, US-2
+status: StoryReviewPassed
+blockers: None
 ---
 
 ## Last Run
-- N/A
+- 2026-05-12: Implemented US-3 — created app.py, main.py, tests/test_main.py. 1/1 unit test passes on Python 3.14.4. ACs 3.5–3.7 require manual verification.
 
 ## Changes Since Last Iteration
-- State files initialized by Planner.
+- Created app.py: PhantomCalendarApp(rumps.App) with name, title, quit_button, Run now menu item stub. No scheduler import.
+- Created main.py: calls get_credentials() before app launch, catches FileNotFoundError → stderr message + sys.exit(1).
+- Created tests/test_main.py: mocks get_credentials raising FileNotFoundError, asserts exit code 1, stderr contains 'Error' and 'credentials.json', no traceback, app not launched.
 
 ## Next Steps
 - Create app.py with PhantomCalendarApp(rumps.App): name='Phantom Calendar', title='⏰', quit_button='Quit', Run now stub. NO scheduler import.
