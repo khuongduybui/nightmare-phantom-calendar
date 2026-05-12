@@ -1,0 +1,1 @@
+- 2026-05-12 — Decision: Initial state files created for US-1 (Project Scaffold). Impact: requirements.txt, .gitignore, tests/smoke_imports.py, tests/__init__.py.

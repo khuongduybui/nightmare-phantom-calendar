@@ -1,0 +1,2 @@
+- 2026-05-12T04:47:03Z — Decision: Spec approved by human. Rationale: All user stories reviewed and accepted. spec_hash: 77dde19595b0. Impact: docs/NPC-0000/spec.md approved; per-story state files updated.
+- 2026-05-12 — Decision: Initial spec created for NPC-0000. Rationale: Feature.md reviewed; all ACs mapped to concrete code identifiers from project.md reference; human-required GCP steps isolated and documented with exact deliverable path for credentials.json. Impact: docs/NPC-0000/spec.md.

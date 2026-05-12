@@ -1,0 +1,1 @@
+- 2026-05-12 — Decision: Initial state files created for US-2 (Auth Module). Impact: auth.py, tests/test_auth.py.

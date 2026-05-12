@@ -1,0 +1,1 @@
+- 2026-05-12 — Decision: Initial state files created for US-3 (Menu Bar App Stub). Impact: app.py, main.py, tests/test_main.py.
