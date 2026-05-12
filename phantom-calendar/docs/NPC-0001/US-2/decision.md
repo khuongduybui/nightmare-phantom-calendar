@@ -1,1 +1,2 @@
 - 2026-05-12 — Decision: Initial state files created for US-2 (Calendar Reader Module). Impact: calendar_reader.py, tests/test_calendar_reader.py.
+- 2026-05-12 — Decision: Both get_msi_time_blocks() and get_personal_events() accept an optional calendar_id parameter (defaulting to the module constant) to allow tests to inject alternate IDs without patching globals.
