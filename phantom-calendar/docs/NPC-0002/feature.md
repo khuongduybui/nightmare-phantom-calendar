@@ -84,3 +84,4 @@ sequenceDiagram
         User->>Popup: Close window
         Popup-->>Sync: confirmed=true, alarm_time=current value
     end
+```

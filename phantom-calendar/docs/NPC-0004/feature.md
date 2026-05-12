@@ -65,3 +65,4 @@ sequenceDiagram
             Pipeline-->>App: Surface error to user
         end
     end
+```

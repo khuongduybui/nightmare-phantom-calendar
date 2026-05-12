@@ -79,3 +79,4 @@ sequenceDiagram
             Writer-->>Sync: Written event ID
         end
     end
+```

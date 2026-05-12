@@ -64,3 +64,4 @@ sequenceDiagram
     end
     Pipeline-->>App: Update last run + last alarm
     App-->>User: Menu bar updated
+```
