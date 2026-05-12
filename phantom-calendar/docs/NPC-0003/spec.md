@@ -1,5 +1,5 @@
 ---
-spec_hash: ''
+spec_hash: 'c70e47fbfcf9'
 ---
 
 # NPC-0003 Spec — Calendar Writer
