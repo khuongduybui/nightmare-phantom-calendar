@@ -13,8 +13,11 @@ __pycache__/
 
 # Build / packaging artifacts
 dist/
-build/
 *.spec
+# Exclude pyinstaller/setuptools output dirs but not our build/ scripts dir
+/build/*.egg-info
+/build/lib
+/build/bdist.*
 
 # macOS
 .DS_Store
