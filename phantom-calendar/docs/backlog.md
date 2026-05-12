@@ -1,6 +1,13 @@
 # Phantom Calendar — Backlog
 
-Deferred items from MVP 2 feature definition. Not prioritized.
+Deferred items from MVP 2 feature definition.
+
+## TOP PRIORITY
+
+### Unknown Meeting Classification (from NPC-0002)
+When the popup shows an unknown MSI block, let the user classify it (dropdown from `config['meeting_type_prep']`). Selecting a type recalculates the alarm time live. The classification is returned in the response and can be written back to `config['recurring_meetings']` in the Drive config file so the meeting is recognized automatically on future runs.
+
+---
 
 ## Scheduler
 - Configurable trigger time (fixed at 9pm in NPC-0004)
