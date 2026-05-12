@@ -1,0 +1,1 @@
+- 2026-05-12 — Decision: Initial state files created for US-1 (ConfirmationPopup). Impact: popup.py, tests/test_popup.py, tests/smoke_imports.py, build/manual_tests.md, README.md.

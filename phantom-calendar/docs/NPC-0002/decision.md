@@ -1,0 +1,4 @@
+- 2026-05-12 — Decision: Initial spec created for NPC-0002 (Confirmation Popup). Single US-1 story scope confirmed — all ACs cohesive around popup.py. compute_alarm() result dict shape verified from compute.py (7 keys). Display modes (normal, baseline, no-meetings) mapped to AC1–AC11. Impact: docs/NPC-0002/spec.md.
+- 2026-05-12 — Decision: popup.py uses tk.Tk() as root (not tk.Toplevel) since there is no parent window — the popup is triggered by a headless nightly sync, not an existing GUI app.
+- 2026-05-12 — Decision: _parse_alarm_override() takes text and reference_dt as explicit args (not reading from self._entry) to make it directly unit-testable without mocking instance state.
+- 2026-05-12 — Decision: Spec approved by human. Rationale: All ACs reviewed and accepted, Option B (show block times) adopted for unknown blocks, Option C added to top of backlog. spec_hash: a56b1060543e. Impact: docs/NPC-0002/spec.md approved; per-story state files updated.
