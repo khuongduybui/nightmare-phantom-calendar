@@ -1,1 +1,4 @@
 - 2026-05-12 — Decision: Initial state files created for US-2 (Auth Module). Impact: auth.py, tests/test_auth.py.
+- 2026-05-12 — Decision: Extracted _write_token() as a private helper to avoid duplicating the open+chmod sequence across the first-run and refresh paths. This keeps both code paths DRY without exposing the helper as part of the public API.
+- 2026-05-12 — Decision: test_auth.py imports `auth` at module bottom (after patch decorators) to allow patching auth.open and auth.os without import-order issues. Added noqa: E402 comment to suppress linter warning.
+- 2026-05-12 — Decision: Installed pytest into the venv (not in requirements.txt per spec scope). requirements.txt is runtime-only per AC1.1.
