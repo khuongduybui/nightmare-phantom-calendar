@@ -52,10 +52,26 @@ class ConfirmationPopup:
 
         self._build_ui()
 
-        # Ensure window appears in front
+        # Ensure window appears in front and claims keyboard focus.
+        # On macOS, focus_force() alone does not steal focus from other apps;
+        # we must activate the process via AppleScript first.
         self._root.lift()
         self._root.attributes("-topmost", True)
+        import os
+        import subprocess
+        subprocess.run(
+            [
+                "osascript", "-e",
+                f'tell application "System Events" to set frontmost of first process'
+                f' whose unix id is {os.getpid()} to true',
+            ],
+            check=False,
+        )
         self._root.focus_force()
+        # Focus the alarm Entry widget once the event loop is running so the
+        # user can type immediately without clicking.
+        if self._alarm_entry is not None:
+            self._root.after(100, self._alarm_entry.focus_set)
 
         # Bind OS close button
         if self._mode == "normal":
@@ -111,12 +127,18 @@ class ConfirmationPopup:
                 btn_frame,
                 text="Write to Calendar",
                 command=self._on_confirm,
+                takefocus=True,
             )
+            self._write_btn.bind("<Return>", lambda _e: self._on_confirm())
+            self._write_btn.bind("<space>", lambda _e: self._on_confirm())
             self._write_btn.pack(side="left", padx=6)
 
-        tk.Button(btn_frame, text="Skip", command=self._on_skip).pack(
-            side="left", padx=6
+        skip_btn = tk.Button(
+            btn_frame, text="Skip", command=self._on_skip, takefocus=True
         )
+        skip_btn.bind("<Return>", lambda _e: self._on_skip())
+        skip_btn.bind("<space>", lambda _e: self._on_skip())
+        skip_btn.pack(side="left", padx=6)
 
     def _build_no_meetings(self) -> None:
         tk.Label(
@@ -169,6 +191,7 @@ class ConfirmationPopup:
         tk.Label(alarm_frame, text="Alarm time:").pack(side="left")
         self._alarm_entry = tk.Entry(alarm_frame, width=8, justify="center")
         self._alarm_entry.insert(0, result["alarm_time"].strftime("%H:%M"))
+        self._alarm_entry.bind("<Return>", lambda _e: self._on_confirm())
         self._alarm_entry.pack(side="left", padx=6)
 
         self._error_label = tk.Label(self._root, text="", fg="red")
