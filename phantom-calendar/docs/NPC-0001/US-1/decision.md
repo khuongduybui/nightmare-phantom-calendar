@@ -1,1 +1,3 @@
 - 2026-05-12 — Decision: Initial state files created for US-1 (Drive Config Module). Impact: drive_config.py, tests/test_drive_config.py.
+- 2026-05-12 — Decision: DEFAULT_CONFIG_YAML loaded at module import time from config.yaml on disk (not hardcoded string) so there is one source of truth; both the file and the constant stay in sync automatically.
+- 2026-05-12 — Decision: bootstrap_config() calls write_config() then checks/renames in two separate Drive API calls rather than a combined update, keeping responsibilities separate and making each step independently testable.
