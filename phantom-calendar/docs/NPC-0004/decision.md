@@ -1,0 +1,4 @@
+- 2026-05-12 — Decision: Initial spec created for NPC-0004 (Scheduler & Nightly Sync). Two user stories: US-1 sync_job.py, US-2 scheduler.py + app.py wiring.
+- 2026-05-12 — Decision: Missed sync detection uses time-of-day check (hour >= 19) at startup, not a persisted "last run" timestamp. If the app starts after 9pm, it always does one sync immediately. Simpler and correct for the stated AC3/AC4 requirements.
+- 2026-05-12 — Decision: Concurrency lock is module-level in sync_job.py (threading.Lock). Acquired at the start of run_nightly_sync(); if held, return immediately. This prevents double-trigger from both scheduler and missed-sync startup paths.
+- 2026-05-12 — Decision: Error surfacing uses rumps.notification() for the user-visible message plus stderr for logging. Does NOT re-raise — scheduler continues running.
