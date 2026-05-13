@@ -2,3 +2,4 @@
 - 2026-05-13 — Decision: tkinter is used (not osascript) because preferences open from a menu callback which runs on the main thread — safe for tkinter unlike sync pipeline.
 - 2026-05-13 — Decision: scheduler.py start_scheduler() extended with trigger_time parameter (default "21:00") to finally make the hardcoded hour configurable via preferences.
 - 2026-05-13 — Decision: Only 5 config keys in scope. More complex settings (recurring meetings, meeting types) remain Drive-config-only — preferences window is for day-to-day user settings.
+- 2026-05-13 — Decision: Spec approved by human. spec_hash: 0e766ccb6247. Impact: docs/NPC-0010/spec.md approved; per-story state files updated.

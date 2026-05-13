@@ -1,5 +1,5 @@
 ---
-spec_hash: ''
+spec_hash: '0e766ccb6247'
 ---
 
 # NPC-0010 Spec — Preferences Window
