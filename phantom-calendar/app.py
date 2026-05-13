@@ -28,19 +28,28 @@ class PhantomCalendarApp(rumps.App):
         """Set the menu bar icon and mark it as a template image for dark mode support.
 
         rumps sets the icon but does not call setTemplate_(True), which means
-        black icons become invisible on dark menu bars. This method calls into
-        AppKit directly to enable automatic light/dark inversion.
+        black icons become invisible on dark menu bars. This method eagerly loads
+        the image via AppKit, marks it as a template, and pushes it directly onto
+        the status item button so macOS auto-inverts it in dark mode.
         """
-        self.icon = path
+        self.icon = path  # keep rumps state in sync
         try:
             import AppKit
-            img = AppKit.NSImage.alloc().initByReferencingFile_(
-                os.path.join(BASE_DIR, path)
-            )
+            abs_path = os.path.join(BASE_DIR, path)
+            # Use initWithContentsOfFile_ (eager load) so setTemplate_ applies before render
+            img = AppKit.NSImage.alloc().initWithContentsOfFile_(abs_path)
+            if img is None:
+                raise ValueError(f"NSImage could not load: {abs_path}")
             img.setTemplate_(True)
-            self._status_item.button().setImage_(img)
-        except Exception:
-            pass  # Fall back to rumps icon (no template — light mode only)
+            # Modern macOS: NSStatusItem exposes a button
+            btn = self._status_item.button()
+            if btn is not None:
+                btn.setImage_(img)
+            else:
+                # Fallback for older macOS without button API
+                self._status_item.setImage_(img)
+        except Exception as exc:
+            print(f"[app] WARNING: Could not apply template icon — {exc}", file=sys.stderr)
     ICON_ERROR = "assets/icon_error.png"
 
     def __init__(self):
