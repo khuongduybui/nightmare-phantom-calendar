@@ -169,7 +169,6 @@ class PhantomCalendarApp(rumps.App):
     # Menu actions
     # ------------------------------------------------------------------
 
-    @rumps.clicked("Preferences…")
     def show_preferences(self, _):
         """Open the preferences window (single-instance guard)."""
         if not _PREFS_OPEN.acquire(blocking=False):
