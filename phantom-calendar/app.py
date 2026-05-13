@@ -25,31 +25,9 @@ class PhantomCalendarApp(rumps.App):
     ICON_SYNCING = "assets/icon_syncing.png"
 
     def _set_icon(self, path: str) -> None:
-        """Set the menu bar icon and mark it as a template image for dark mode support.
+        """Set the menu bar icon."""
 
-        rumps sets the icon but does not call setTemplate_(True), which means
-        black icons become invisible on dark menu bars. This method eagerly loads
-        the image via AppKit, marks it as a template, and pushes it directly onto
-        the status item button so macOS auto-inverts it in dark mode.
-        """
-        self.icon = path  # keep rumps state in sync
-        try:
-            import AppKit
-            abs_path = os.path.join(BASE_DIR, path)
-            # Use initWithContentsOfFile_ (eager load) so setTemplate_ applies before render
-            img = AppKit.NSImage.alloc().initWithContentsOfFile_(abs_path)
-            if img is None:
-                raise ValueError(f"NSImage could not load: {abs_path}")
-            img.setTemplate_(True)
-            # Modern macOS: NSStatusItem exposes a button
-            btn = self._status_item.button()
-            if btn is not None:
-                btn.setImage_(img)
-            else:
-                # Fallback for older macOS without button API
-                self._status_item.setImage_(img)
-        except Exception as exc:
-            print(f"[app] WARNING: Could not apply template icon — {exc}", file=sys.stderr)
+        self.icon = path
     ICON_ERROR = "assets/icon_error.png"
 
     def __init__(self):
@@ -95,9 +73,7 @@ class PhantomCalendarApp(rumps.App):
         # Start the background scheduler
         self._scheduler = start_scheduler(self._timezone_str)
 
-        # Re-apply icon as a template image now that the status item exists.
-        # Respect error state restored by _load_state().
-        self._set_icon(self.ICON_ERROR if self._last_sync_failed else self.ICON_IDLE)
+        # Icon is already set via self.icon= in _load_state() or defaults to ICON_IDLE from super().__init__
 
     def __del__(self):
         if hasattr(self, "_scheduler") and self._scheduler:
