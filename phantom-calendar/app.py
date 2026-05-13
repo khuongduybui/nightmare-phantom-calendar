@@ -170,20 +170,29 @@ class PhantomCalendarApp(rumps.App):
     # ------------------------------------------------------------------
 
     def show_preferences(self, _):
-        """Open the preferences window (single-instance guard)."""
+        """Open the preferences window in a background thread (single-instance guard).
+
+        tkinter's mainloop conflicts with AppKit's NSRunLoop on the main thread in rumps.
+        Running PreferencesWindow in a daemon thread sidesteps this — tkinter still
+        works because it's the only UI framework running in that thread.
+        """
         if not _PREFS_OPEN.acquire(blocking=False):
             return  # already open
-        try:
+
+        def _run():
             try:
-                config = parse_config(read_config())
-            except Exception as exc:
-                print(f"[app] WARNING: Could not load config for prefs — {exc}", file=sys.stderr)
-                config = {}
-            result = PreferencesWindow(config).show()
-            if result is not None:
-                self._save_preferences(result)
-        finally:
-            _PREFS_OPEN.release()
+                try:
+                    config = parse_config(read_config())
+                except Exception as exc:
+                    print(f"[app] WARNING: Could not load config for prefs — {exc}", file=sys.stderr)
+                    config = {}
+                result = PreferencesWindow(config).show()
+                if result is not None:
+                    self._save_preferences(result)
+            finally:
+                _PREFS_OPEN.release()
+
+        threading.Thread(target=_run, daemon=True).start()
 
     def _save_preferences(self, updated: dict) -> None:
         """Write updated settings to Drive config and restart the scheduler."""
