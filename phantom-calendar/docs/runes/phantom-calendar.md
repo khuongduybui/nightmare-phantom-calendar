@@ -74,14 +74,43 @@ Apply during Implementer, QA, Story-Review, and Feature-Review phases.
 **Action:**
 1. Generate the new icon using the **same alarm clock base silhouette** defined in `docs/NPC-0009/feature.md`. All icons must share this base — only the overlay badge/annotation changes.
 2. Use the Gemini image generation prompts in `docs/NPC-0009/feature.md` as a template, adapting only the overlay description.
-3. Spec: 36×36 px, black monochrome line art, transparent background, single stroke weight, no fill, no gradients, no shadows.
+3. Spec: 72×72 px (36pt @2x Retina), **white** monochrome line art on transparent background, single stroke weight, no fill, no gradients. Use white (not black) — rumps does not call `setTemplate_(True)` so icons are not auto-inverted; white is visible on dark menu bars and macOS dims white icons appropriately on light bars.
 4. Place the new PNG in `assets/` and update `app.py` to reference it in the correct state handler.
 5. Update `README.md` icon table with the new state.
 
 **Owner:** Implementer, Feature-Review
 
 ---
+## Rule: no-tkinter-in-rumps-process
 
+**When:** Any feature introduces UI shown while the rumps app is running (menu callbacks, sync pipeline, background threads).
+**Action:** Do NOT use `tkinter` (`tk.Tk()`, `tk.mainloop()`) inside the running app. AppKit's `NSRunLoop` owns the main thread and `TkpGetColor` requires it — tkinter crashes with `NSInvalidArgumentException` from any thread inside a rumps process.
+- **Sync pipeline UI** (background thread): use `subprocess.run(["osascript", ...])` dialogs.
+- **Menu callback UI** (main thread): also use osascript — tkinter's `macOSVersion` selector still fails even on the main thread within AppKit.
+- **Preferences/settings**: use sequential osascript `display dialog` / `choose from list` calls.
+- `popup.py` has been removed. Use `sync_job._show_popup()` and `preferences.PreferencesWindow` (both osascript-based) as the established pattern.
+**Owner:** Implementer, QA
+
+---
+
+## Rule: no-heredoc-in-fish
+
+**When:** Any shell command needs to write multi-line content to a file.
+**Action:** Fish shell does NOT support `<<` heredoc syntax. Use one of these alternatives:
+- `echo "content" > file` for single-line content
+- Python one-liner: `uv run python -c "open('file','w').write('content')"`
+- The file creation tools in the agent (preferred for new files)
+**Owner:** Implementer
+
+---
+
+## Rule: local-state-files-in-gitignore
+
+**When:** Any feature introduces a local state or cache file that persists across runs.
+**Action:** Add the file to `.gitignore`. Confirmed exclusions: `credentials.json`, `token.json`, `.drive_config_id`, `.phantom_state.json`. Pattern: dot-files at project root that hold runtime state are never committed.
+**Owner:** Implementer, Story-Review
+
+---
 ## Rule: no-scheduler-in-npc-0000
 
 **When:** Reviewing NPC-0000 scope only.
