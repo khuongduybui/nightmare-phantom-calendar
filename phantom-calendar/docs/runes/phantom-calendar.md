@@ -68,6 +68,20 @@ Apply during Implementer, QA, Story-Review, and Feature-Review phases.
 
 ---
 
+## Rule: icon-design-consistency
+
+**When:** Any feature introduces a new visual state for the menu bar app (new icon needed).
+**Action:**
+1. Generate the new icon using the **same alarm clock base silhouette** defined in `docs/NPC-0009/feature.md`. All icons must share this base — only the overlay badge/annotation changes.
+2. Use the Gemini image generation prompts in `docs/NPC-0009/feature.md` as a template, adapting only the overlay description.
+3. Spec: 36×36 px, black monochrome line art, transparent background, single stroke weight, no fill, no gradients, no shadows.
+4. Place the new PNG in `assets/` and update `app.py` to reference it in the correct state handler.
+5. Update `README.md` icon table with the new state.
+
+**Owner:** Implementer, Feature-Review
+
+---
+
 ## Rule: no-scheduler-in-npc-0000
 
 **When:** Reviewing NPC-0000 scope only.

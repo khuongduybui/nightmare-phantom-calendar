@@ -61,7 +61,23 @@ pip install -r requirements.txt
 python main.py
 ```
 
-On first launch, a browser window opens for Google OAuth sign-in. After approving, the ⏰ icon appears in the macOS menu bar.
+On first launch, a browser window opens for Google OAuth sign-in. After approving, the menu bar icon appears. Subsequent launches restore the last sync status immediately from `.phantom_state.json`.
+
+---
+
+## Menu Bar Icons
+
+The app uses three monochrome PNG template images that adapt automatically to macOS light/dark mode:
+
+| File | State | Description |
+|------|-------|-------------|
+| `assets/icon.png` | Idle | Alarm clock with hands at ~9:00 |
+| `assets/icon_syncing.png` | Sync in progress | Alarm clock with refresh arrows |
+| `assets/icon_error.png` | Last sync failed | Alarm clock with exclamation badge |
+
+**Design spec:** 36×36 px, black monochrome line art on transparent background, single stroke weight, no fill, no gradients. macOS treats these as template images (auto light/dark inversion).
+
+To generate new icons (e.g. after new sync states are added), see [docs/NPC-0009/feature.md](docs/NPC-0009/feature.md) for the Gemini image generation prompts. All icons must share the same alarm clock base silhouette for visual consistency.
 
 Subsequent launches use the cached token at `token.json` (also excluded from git).
 
@@ -113,6 +129,10 @@ phantom-calendar/
 ├── calendar_writer.py    Writes alarm event to Google Calendar; overrides baseline occurrence
 ├── sync_job.py           Nightly sync pipeline (config → compute → popup → write), with lock
 ├── scheduler.py          APScheduler 21:00 daily trigger and missed-sync detection
+├── assets/
+│   ├── icon.png          Menu bar icon — idle state
+│   ├── icon_syncing.png  Menu bar icon — sync in progress
+│   └── icon_error.png    Menu bar icon — last sync failed
 ├── config.yaml           Default configuration (committed; auto-pushed to Drive)
 ├── requirements.txt      Pinned runtime dependencies
 ├── .gitignore            Excludes credentials.json, token.json, .venv/, etc.
