@@ -1,6 +1,7 @@
 # Secrets — never commit
 credentials.json
 token.json
+.drive_config_id
 
 # Python
 __pycache__/

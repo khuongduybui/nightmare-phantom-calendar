@@ -9,9 +9,33 @@ from auth import get_drive_service
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-CONFIG_FILE_ID = os.environ.get(
-    "PHANTOM_CONFIG_FILE_ID", "1nZ8-G5vwi9O8r4hAmbBS9zl55cVVjXz6"
-)
+# Local file that persists the Drive config file ID across restarts.
+DRIVE_CONFIG_ID_FILE = os.path.join(BASE_DIR, ".drive_config_id")
+
+
+def _load_config_file_id() -> str:
+    """Return the Drive config file ID, preferring (in order):
+    1. PHANTOM_CONFIG_FILE_ID env var
+    2. Contents of .drive_config_id local file
+    3. Hardcoded default (may no longer exist on Drive)
+    """
+    if env_id := os.environ.get("PHANTOM_CONFIG_FILE_ID"):
+        return env_id
+    if os.path.exists(DRIVE_CONFIG_ID_FILE):
+        with open(DRIVE_CONFIG_ID_FILE) as f:
+            stored = f.read().strip()
+            if stored:
+                return stored
+    return "1nZ8-G5vwi9O8r4hAmbBS9zl55cVVjXz6"
+
+
+def _save_config_file_id(file_id: str) -> None:
+    """Persist a Drive file ID to the local .drive_config_id file."""
+    with open(DRIVE_CONFIG_ID_FILE, "w") as f:
+        f.write(file_id)
+
+
+CONFIG_FILE_ID = _load_config_file_id()
 
 # Default config — mirrors config.yaml at the project root.
 with open(os.path.join(BASE_DIR, "config.yaml"), "r") as _f:
@@ -34,10 +58,24 @@ _DEFAULTS = {
 
 
 def read_config() -> str:
-    """Fetch config from Drive. Bootstraps with defaults if content is invalid YAML."""
+    """Fetch config from Drive. Creates a new file if not found (404).
+    Bootstraps with defaults if content is invalid YAML.
+    """
+    global CONFIG_FILE_ID
     service = get_drive_service()
-    request = service.files().get_media(fileId=CONFIG_FILE_ID)
-    raw = request.execute()
+
+    try:
+        request = service.files().get_media(fileId=CONFIG_FILE_ID)
+        raw = request.execute()
+    except Exception as exc:
+        # 404 or any other error — create a fresh config file on Drive
+        print(f"[drive_config] Config file not found ({exc}); creating new file on Drive.")
+        new_id = _create_config_file(service)
+        CONFIG_FILE_ID = new_id
+        _save_config_file_id(new_id)
+        print(f"[drive_config] Created new Drive config file: {new_id}")
+        return DEFAULT_CONFIG_YAML
+
     if isinstance(raw, bytes):
         raw = raw.decode("utf-8")
 
@@ -51,6 +89,25 @@ def read_config() -> str:
         return DEFAULT_CONFIG_YAML
 
     return raw
+
+
+def _create_config_file(service) -> str:
+    """Create a new plain-text config file on Drive with DEFAULT_CONFIG_YAML content.
+
+    Returns the new file's Drive ID.
+    """
+    from googleapiclient.http import MediaIoBaseUpload
+
+    media = MediaIoBaseUpload(
+        io.BytesIO(DEFAULT_CONFIG_YAML.encode("utf-8")), mimetype="text/plain"
+    )
+    file_meta = {"name": "config.yaml"}
+    created = (
+        service.files()
+        .create(body=file_meta, media_body=media, fields="id")
+        .execute()
+    )
+    return created["id"]
 
 
 def bootstrap_config() -> None:
