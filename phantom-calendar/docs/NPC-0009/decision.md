@@ -1,3 +1,4 @@
 - 2026-05-12 — Decision: Initial spec created for NPC-0009. Single US-1 story. Human steps H-1 through H-3 must precede code testing but not code writing.
 - 2026-05-12 — Decision: Unit tests mock icon file paths rather than loading actual PNG content, so tests can pass before icons are generated.
 - 2026-05-12 — Decision: Only self.icon is changed — self.title can remain as the app name (not the icon emoji). The title= param in super().__init__() is the app name, icon= is the separate icon parameter.
+- 2026-05-12 — Decision: Spec approved by human. H-1 through H-3 complete — 3 PNGs placed at assets/, processed to 72x72 pure black-on-transparent. spec_hash: ba25c3ccc293.

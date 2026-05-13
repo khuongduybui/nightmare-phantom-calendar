@@ -1,6 +1,6 @@
 ---
 phase: Implementer
-spec_hash: ''
+spec_hash: 'ba25c3ccc293'
 status: NotStarted
 blockers: H-1, H-2, H-3 (human — icon generation)
 ---

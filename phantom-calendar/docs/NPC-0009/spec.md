@@ -1,5 +1,5 @@
 ---
-spec_hash: ''
+spec_hash: 'ba25c3ccc293'
 ---
 
 # NPC-0009 Spec — Custom Icon Design
