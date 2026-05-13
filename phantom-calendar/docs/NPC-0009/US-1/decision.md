@@ -1,0 +1,1 @@
+- 2026-05-12 — Decision: Initial state files created for US-1 (Wire Icons). Impact: app.py, assets/*.png (human), tests/test_icon_wiring.py.
