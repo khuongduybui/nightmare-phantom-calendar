@@ -4,9 +4,6 @@ Deferred items from MVP 2 feature definition.
 
 ## TOP PRIORITY
 
-### Unknown Meeting Classification (from NPC-0002)
-When the popup shows an unknown MSI block, let the user classify it (dropdown from `config['meeting_type_prep']`). Selecting a type recalculates the alarm time live. The classification is returned in the response and can be written back to `config['recurring_meetings']` in the Drive config file so the meeting is recognized automatically on future runs.
-
 ---
 
 ## Scheduler
@@ -25,7 +22,6 @@ When the popup shows an unknown MSI block, let the user classify it (dropdown fr
 - Undo / manual deletion of a written alarm outside of a sync run
 
 ## Menu Bar App (NPC-0005)
-- Persist last run state and last alarm time across app restarts
 - Custom icon design
 - Preferences / settings window
 
