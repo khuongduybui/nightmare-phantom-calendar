@@ -1,5 +1,5 @@
 ---
-spec_hash: 'c45b782ee969'
+spec_hash: '90b7d00b6727'
 ---
 
 # NPC-0004 Spec — Scheduler & Nightly Sync
@@ -17,8 +17,8 @@ spec_hash: 'c45b782ee969'
 | "show confirmation popup" | `popup.ConfirmationPopup(result).show()` | `popup.py` |
 | "write to calendar" | `calendar_writer.run_calendar_write()` | `calendar_writer.py` |
 | "scheduler" | `APScheduler BackgroundScheduler` | `scheduler.py` (to create) |
-| "9pm trigger" | `CronTrigger(hour=19, minute=0, timezone=LOCAL_TZ)` | `scheduler.py` |
-| "missed sync detection" | compare `datetime.now(LOCAL_TZ).hour >= 19` at startup | `scheduler.py` |
+| "9pm trigger" | `CronTrigger(hour=21, minute=0, timezone=LOCAL_TZ)` | `scheduler.py` |
+| "missed sync detection" | compare `datetime.now(LOCAL_TZ).hour >= 21` at startup | `scheduler.py` |
 | "app launch" | `PhantomCalendarApp.__init__()` | `app.py` (modify) |
 | "surface error" | `rumps.notification(...)` or `print(..., file=sys.stderr)` | `sync_job.py` |
 
@@ -26,9 +26,9 @@ spec_hash: 'c45b782ee969'
 
 1. **`sync_job.py`** — the sync pipeline function `run_nightly_sync()`. Orchestrates the full flow: read_config → parse_config → get_msi_time_blocks → get_personal_events → compute_alarm → ConfirmationPopup.show() → run_calendar_write(). Standalone module with no UI.
 
-2. **`scheduler.py`** — starts a `BackgroundScheduler` with a daily `CronTrigger` at 19:00 local time. Exposes `start_scheduler()` → returns the scheduler instance.
+2. **`scheduler.py`** — starts a `BackgroundScheduler` with a daily `CronTrigger` at 21:00 local time. Exposes `start_scheduler()` → returns the scheduler instance.
 
-3. **Missed sync detection** — at startup, check if current local time ≥ 19:00. If yes, run the sync immediately in a background thread, then schedule normally. "Already ran today" is not tracked — if the app starts after 9pm, it always runs once. This satisfies AC3 and AC4 (no repeat after that single startup run; next trigger is the following day's 9pm).
+3. **Missed sync detection** — at startup, check if current local time ≥ 21:00. If yes, run the sync immediately in a background thread, then schedule normally. "Already ran today" is not tracked — if the app starts after 9pm, it always runs once. This satisfies AC3 and AC4 (no repeat after that single startup run; next trigger is the following day's 9pm).
 
 4. **AC5 (no double trigger)** — use a `threading.Lock` in `sync_job.py`. `run_nightly_sync()` acquires the lock at start; returns immediately if already held. This prevents concurrent runs whether triggered by scheduler or missed-sync startup.
 
@@ -36,7 +36,7 @@ spec_hash: 'c45b782ee969'
 
 6. **`app.py` changes** — `PhantomCalendarApp.__init__()` calls `start_scheduler()` and stores the result. This is the wiring NPC-0000 deliberately left out.
 
-7. **Trigger time** — hardcoded `hour=19, minute=0`. Not configurable (AC6 / non-goal). Uses `config["timezone"]` for the cron timezone — read once at scheduler start.
+7. **Trigger time** — hardcoded `hour=21, minute=0`. Not configurable (AC6 / non-goal). Uses `config["timezone"]` for the cron timezone — read once at scheduler start.
 
 8. **Config read timing** — config is read fresh on each sync run (not cached) so Drive config changes take effect at the next 9pm.
 
@@ -83,8 +83,8 @@ After implementing, run `uv run main.py` and verify the popup appears at 9pm or 
 **Acceptance Criteria:**
 
 - AC2.1: `scheduler.py` exists at project root.
-- AC2.2: `start_scheduler(timezone_str: str) -> BackgroundScheduler` creates a `BackgroundScheduler`, adds a `CronTrigger(hour=19, minute=0, timezone=timezone_str)` job targeting `run_nightly_sync`, starts the scheduler, and returns it. (feature.md AC1, AC6)
-- AC2.3: `check_and_run_missed_sync(timezone_str: str) -> None` checks `datetime.now(pytz.timezone(timezone_str)).hour >= 19`. If true, runs `run_nightly_sync()` in a `threading.Thread(daemon=True)`. (feature.md AC3, AC4)
+- AC2.2: `start_scheduler(timezone_str: str) -> BackgroundScheduler` creates a `BackgroundScheduler`, adds a `CronTrigger(hour=21, minute=0, timezone=timezone_str)` job targeting `run_nightly_sync`, starts the scheduler, and returns it. (feature.md AC1, AC6)
+- AC2.3: `check_and_run_missed_sync(timezone_str: str) -> None` checks `datetime.now(pytz.timezone(timezone_str)).hour >= 21`. If true, runs `run_nightly_sync()` in a `threading.Thread(daemon=True)`. (feature.md AC3, AC4)
 - AC2.4: `PhantomCalendarApp.__init__()` in `app.py` is updated to:
   - Read timezone from config (call `parse_config(read_config())` once at startup)
   - Call `check_and_run_missed_sync(timezone_str)`
@@ -94,7 +94,7 @@ After implementing, run `uv run main.py` and verify the popup appears at 9pm or 
 - AC2.6: Scheduler job failures do not crash the scheduler — APScheduler's default `misfire_grace_time` and exception handling are sufficient; no additional wrapper needed beyond `sync_job.py`'s internal try/except. (feature.md AC7)
 
 **Test coverage (`tests/test_scheduler.py`):**
-- `test_start_scheduler_adds_cron_job` — mock BackgroundScheduler; assert `add_job` called with CronTrigger at hour=19.
+- `test_start_scheduler_adds_cron_job` — mock BackgroundScheduler; assert `add_job` called with CronTrigger at hour=21.
 - `test_start_scheduler_starts_scheduler` — assert `scheduler.start()` called.
 - `test_check_missed_sync_runs_when_after_9pm` — mock `datetime.now()` returning 21:00; assert `run_nightly_sync` called in thread.
 - `test_check_missed_sync_skips_when_before_9pm` — mock `datetime.now()` returning 18:00; assert `run_nightly_sync` NOT called.
@@ -122,7 +122,7 @@ After implementing, run `uv run main.py` and verify the popup appears at 9pm or 
 - Fish shell, uv conventions.
 - macOS only.
 - `sync_job.py` and `scheduler.py` at project root.
-- Trigger time 19:00 hardcoded — not configurable in this feature.
+- Trigger time 21:00 hardcoded — not configurable in this feature.
 - `auth.py` must not be modified.
 - All API calls mocked in unit tests.
 
