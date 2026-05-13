@@ -96,7 +96,7 @@ bash build/tests.sh
 This script:
 - Verifies the venv is active
 - Runs `tests/smoke_imports.py` (confirms all packages importable)
-- Runs `pytest tests/` (37 unit tests covering auth, Drive config, calendar reading, and alarm computation)
+- Runs `pytest tests/` covering auth, Drive config, calendar reading, alarm computation, sync pipeline, and preferences
 
 ### Manual tests
 
@@ -106,7 +106,7 @@ See [build/manual_tests.md](build/manual_tests.md) for the full list of manual a
 |----|-------------|
 | MT-1.3 | venv creation and `pip install -r requirements.txt` exits 0 |
 | MT-1.4 | All packages present after install (`pip show`) |
-| MT-2.11 | Confirmation popup appears above all windows and claims focus |
+| MT-2.11 | Confirmation dialog appears and is usable (osascript) |
 | MT-4.AC1 | Popup appears automatically at 9pm (or immediately on late startup) |
 | MT-5.AC10 | App registers as a Login Item and launches on Mac login |
 | MT-3.5 | ⏰ icon appears in macOS menu bar |
@@ -125,10 +125,9 @@ phantom-calendar/
 ├── drive_config.py       Google Drive config read/parse/bootstrap (YAML)
 ├── calendar_reader.py    Reads MSI time blocks and Personal calendar events
 ├── compute.py            Matches meetings and computes alarm time
-├── popup.py              Confirmation popup (tkinter) — user reviews and confirms alarm
-├── preferences.py        Preferences window (tkinter) — edit trigger time, timezone, prep minutes, calendar IDs
+├── preferences.py        Preferences window (osascript) — edit trigger time, timezone, prep minutes, calendar IDs
 ├── calendar_writer.py    Writes alarm event to Google Calendar; overrides baseline occurrence
-├── sync_job.py           Nightly sync pipeline (config → compute → popup → write), with lock
+├── sync_job.py           Nightly sync pipeline (config → compute → dialog → write), with lock
 ├── scheduler.py          APScheduler 21:00 daily trigger and missed-sync detection
 ├── assets/
 │   ├── icon.png          Menu bar icon — idle state
@@ -147,7 +146,6 @@ phantom-calendar/
     ├── test_drive_config.py  Drive config unit tests
     ├── test_calendar_reader.py  Calendar reader unit tests
     ├── test_compute.py       Compute module unit tests
-    ├── test_popup.py         Confirmation popup unit tests
     ├── test_calendar_writer.py  Calendar writer unit tests
     ├── test_sync_job.py      Nightly sync pipeline unit tests
     ├── test_scheduler.py     Scheduler unit tests

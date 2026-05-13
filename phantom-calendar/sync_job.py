@@ -74,12 +74,7 @@ def _classify_unknown_blocks(
 
 
 def _show_popup(result: dict, config: dict | None = None) -> dict:
-    """Show the alarm confirmation dialog using osascript (works from any thread).
-
-    Using tkinter (popup.py) crashes when called from a background thread inside
-    a rumps app because AppKit owns the main thread. osascript spawns a subprocess
-    and shows a native macOS dialog safely from any thread.
-    """
+    """Show the alarm confirmation dialog using osascript (works from any thread)."""
     meeting_name = result.get("first_meeting_name")
 
     # No meetings

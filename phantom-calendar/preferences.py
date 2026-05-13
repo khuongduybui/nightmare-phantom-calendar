@@ -1,9 +1,4 @@
-"""Preferences window — sequential osascript dialogs for editing core settings.
-
-tkinter cannot be used inside a rumps process (AppKit's NSRunLoop owns the main
-thread; tkinter's TkpGetColor also requires it, even from background threads).
-osascript dialogs are subprocess-based and work from any thread.
-"""
+"""Preferences window — sequential osascript dialogs for editing core settings."""
 
 import re
 import subprocess
