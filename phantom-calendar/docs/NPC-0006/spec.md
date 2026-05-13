@@ -1,5 +1,5 @@
 ---
-spec_hash: ''
+spec_hash: 'c9c39c139945'
 ---
 
 # NPC-0006 Spec — On-Demand Sync (Run Now)
