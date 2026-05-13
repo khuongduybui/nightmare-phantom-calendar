@@ -21,10 +21,14 @@ from sync_job import queue_run, run_nightly_sync
 class PhantomCalendarApp(rumps.App):
     """Menu bar application with nightly sync scheduler and status display."""
 
+    ICON_IDLE = "assets/icon.png"
+    ICON_SYNCING = "assets/icon_syncing.png"
+    ICON_ERROR = "assets/icon_error.png"
+
     def __init__(self):
         super().__init__(
             name="Phantom Calendar",
-            title="⏰",
+            icon=self.ICON_IDLE,
             quit_button="Quit",
         )
 
@@ -78,9 +82,9 @@ class PhantomCalendarApp(rumps.App):
     def set_syncing(self, syncing: bool) -> None:
         """Update the menu bar icon to reflect sync-in-progress state."""
         if syncing:
-            self.title = "⏳"
+            self.icon = self.ICON_SYNCING
         else:
-            self.title = "⏰❌" if self._last_sync_failed else "⏰"
+            self.icon = self.ICON_ERROR if self._last_sync_failed else self.ICON_IDLE
 
     def update_sync_state(self, alarm_time: datetime | None, failed: bool) -> None:
         """Update status menu items and icon after a sync completes."""
@@ -97,7 +101,7 @@ class PhantomCalendarApp(rumps.App):
         else:
             self._last_alarm_item.title = "Alarm: none"
 
-        self.title = "⏰❌" if failed else "⏰"
+        self.icon = self.ICON_ERROR if failed else self.ICON_IDLE
         self._save_state()
 
     # ------------------------------------------------------------------
@@ -144,7 +148,7 @@ class PhantomCalendarApp(rumps.App):
                 self._last_alarm_item.title = "Alarm: none"
 
             if self._last_sync_failed:
-                self.title = "⏰❌"
+                self.icon = self.ICON_ERROR
         except Exception as exc:
             print(f"[app] WARNING: Could not parse saved state — {exc}", file=sys.stderr)
 

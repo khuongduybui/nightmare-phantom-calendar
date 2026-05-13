@@ -87,7 +87,7 @@ class TestStatePersistence(unittest.TestCase):
         with open(self.state_file, "w") as f:
             json.dump(state, f)
         a = _make_app(self.state_file)
-        self.assertEqual(a.title, "⏰❌")
+        self.assertEqual(a.icon, app.PhantomCalendarApp.ICON_ERROR)
 
     def test_load_state_missing_file_does_not_crash(self):
         # No state file — should initialize with placeholders
@@ -104,11 +104,18 @@ class TestStatePersistence(unittest.TestCase):
 
     def test_save_state_failure_is_non_fatal(self):
         a = _make_app(self.state_file)
+        # Patch only the json.dump write path, not all open calls
+        import json
+        original_dump = json.dump
+        def failing_dump(*args, **kwargs):
+            raise OSError("disk full")
         with patch("app.STATE_FILE", self.state_file):
-            with patch("builtins.open", side_effect=OSError("disk full")):
+            with patch("json.dump", side_effect=failing_dump):
                 # Must not raise
                 a.update_sync_state(_dt(9, 25), failed=False)
         self.assertEqual(a._last_run_time.hour, datetime.now(LOCAL_TZ).hour)
+        # Icon should be idle (not error) since failed=False
+        self.assertEqual(a.icon, app.PhantomCalendarApp.ICON_IDLE)
 
 
 import app  # noqa: E402

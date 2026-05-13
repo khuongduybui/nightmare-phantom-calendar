@@ -2,7 +2,7 @@
 
 import unittest
 from datetime import date, datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, patch as mock_patch
 
 import pytz
 
@@ -23,6 +23,12 @@ def _make_app():
         patch("app.check_and_run_missed_sync"),
         patch("app.start_scheduler", return_value=MagicMock()),
         patch("app.subprocess.run", return_value=MagicMock(returncode=0)),
+        # Patch icon constants to None so rumps doesn't try to load the PNG files
+        patch.object(app.PhantomCalendarApp, "ICON_IDLE", None),
+        patch.object(app.PhantomCalendarApp, "ICON_SYNCING", None),
+        patch.object(app.PhantomCalendarApp, "ICON_ERROR", None),
+        # Use nonexistent state file so _load_state is a no-op
+        patch("app.STATE_FILE", "/tmp/nonexistent_test_state_xyz.json"),
     ):
         return app.PhantomCalendarApp()
 
@@ -57,29 +63,29 @@ class TestStatusMenuItems(unittest.TestCase):
     def test_update_sync_state_failed_sets_error_icon(self):
         a = _make_app()
         a.update_sync_state(None, failed=True)
-        self.assertEqual(a.title, "⏰❌")
+        self.assertEqual(a.icon, app.PhantomCalendarApp.ICON_ERROR)
 
     def test_update_sync_state_success_sets_normal_icon(self):
         a = _make_app()
         a.update_sync_state(_dt(9, 25), failed=False)
-        self.assertEqual(a.title, "⏰")
+        self.assertEqual(a.icon, app.PhantomCalendarApp.ICON_IDLE)
 
     def test_set_syncing_true_sets_spinner(self):
         a = _make_app()
         a.set_syncing(True)
-        self.assertEqual(a.title, "⏳")
+        self.assertEqual(a.icon, app.PhantomCalendarApp.ICON_SYNCING)
 
     def test_set_syncing_false_restores_error_icon_when_failed(self):
         a = _make_app()
         a._last_sync_failed = True
         a.set_syncing(False)
-        self.assertEqual(a.title, "⏰❌")
+        self.assertEqual(a.icon, app.PhantomCalendarApp.ICON_ERROR)
 
     def test_set_syncing_false_restores_normal_icon_when_ok(self):
         a = _make_app()
         a._last_sync_failed = False
         a.set_syncing(False)
-        self.assertEqual(a.title, "⏰")
+        self.assertEqual(a.icon, app.PhantomCalendarApp.ICON_IDLE)
 
 
 class TestLoginItem(unittest.TestCase):
