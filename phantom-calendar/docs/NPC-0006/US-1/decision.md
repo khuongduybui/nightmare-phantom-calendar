@@ -1,0 +1,1 @@
+- 2026-05-12 — Decision: Initial state files created for US-1. Impact: sync_job.py, app.py, tests/test_on_demand_sync.py, README.md.

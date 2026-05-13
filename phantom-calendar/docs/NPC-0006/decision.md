@@ -1,0 +1,2 @@
+- 2026-05-12 — Decision: Initial spec created for NPC-0006. Single US-1 story. threading.Event chosen as queue (idempotent set() satisfies AC4 with zero extra logic).
+- 2026-05-12 — Decision: Pending run check placed after _SYNC_LOCK.release() in the finally block of run_nightly_sync(). This ensures the lock is free before the recursive call — no deadlock risk.
