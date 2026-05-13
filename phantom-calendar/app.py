@@ -23,6 +23,24 @@ class PhantomCalendarApp(rumps.App):
 
     ICON_IDLE = "assets/icon.png"
     ICON_SYNCING = "assets/icon_syncing.png"
+
+    def _set_icon(self, path: str) -> None:
+        """Set the menu bar icon and mark it as a template image for dark mode support.
+
+        rumps sets the icon but does not call setTemplate_(True), which means
+        black icons become invisible on dark menu bars. This method calls into
+        AppKit directly to enable automatic light/dark inversion.
+        """
+        self.icon = path
+        try:
+            import AppKit
+            img = AppKit.NSImage.alloc().initByReferencingFile_(
+                os.path.join(BASE_DIR, path)
+            )
+            img.setTemplate_(True)
+            self._status_item.button().setImage_(img)
+        except Exception:
+            pass  # Fall back to rumps icon (no template — light mode only)
     ICON_ERROR = "assets/icon_error.png"
 
     def __init__(self):
@@ -68,6 +86,10 @@ class PhantomCalendarApp(rumps.App):
         # Start the background scheduler
         self._scheduler = start_scheduler(self._timezone_str)
 
+        # Re-apply icon as a template image now that the status item exists.
+        # Respect error state restored by _load_state().
+        self._set_icon(self.ICON_ERROR if self._last_sync_failed else self.ICON_IDLE)
+
     def __del__(self):
         if hasattr(self, "_scheduler") and self._scheduler:
             try:
@@ -82,9 +104,9 @@ class PhantomCalendarApp(rumps.App):
     def set_syncing(self, syncing: bool) -> None:
         """Update the menu bar icon to reflect sync-in-progress state."""
         if syncing:
-            self.icon = self.ICON_SYNCING
+            self._set_icon(self.ICON_SYNCING)
         else:
-            self.icon = self.ICON_ERROR if self._last_sync_failed else self.ICON_IDLE
+            self._set_icon(self.ICON_ERROR if self._last_sync_failed else self.ICON_IDLE)
 
     def update_sync_state(self, alarm_time: datetime | None, failed: bool) -> None:
         """Update status menu items and icon after a sync completes."""
@@ -101,7 +123,7 @@ class PhantomCalendarApp(rumps.App):
         else:
             self._last_alarm_item.title = "Alarm: none"
 
-        self.icon = self.ICON_ERROR if failed else self.ICON_IDLE
+        self._set_icon(self.ICON_ERROR if failed else self.ICON_IDLE)
         self._save_state()
 
     # ------------------------------------------------------------------
@@ -148,7 +170,7 @@ class PhantomCalendarApp(rumps.App):
                 self._last_alarm_item.title = "Alarm: none"
 
             if self._last_sync_failed:
-                self.icon = self.ICON_ERROR
+                self._set_icon(self.ICON_ERROR)
         except Exception as exc:
             print(f"[app] WARNING: Could not parse saved state — {exc}", file=sys.stderr)
 
