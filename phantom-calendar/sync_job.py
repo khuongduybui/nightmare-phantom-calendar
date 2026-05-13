@@ -12,6 +12,21 @@ from drive_config import parse_config, read_config
 from popup import ConfirmationPopup
 
 _SYNC_LOCK = threading.Lock()
+_PENDING_RUN = threading.Event()
+
+
+def queue_run(app_ref=None) -> None:
+    """Request a sync run, queuing it if one is already in progress.
+
+    If no sync is running, calls run_nightly_sync() directly.
+    If a sync is running, sets _PENDING_RUN so the current run triggers
+    a follow-up immediately after it completes (at most one pending run).
+    """
+    if _SYNC_LOCK.locked():
+        _PENDING_RUN.set()
+        print("[sync_job] Sync in progress — queued one pending run.", file=sys.stderr)
+    else:
+        run_nightly_sync(app_ref)
 
 
 def run_nightly_sync(app_ref=None) -> None:
@@ -80,3 +95,7 @@ def run_nightly_sync(app_ref=None) -> None:
                 app_ref.update_sync_state(alarm_time, failed)
             except Exception:
                 pass
+        # Run any queued on-demand sync now that the lock is free
+        if _PENDING_RUN.is_set():
+            _PENDING_RUN.clear()
+            run_nightly_sync(app_ref)

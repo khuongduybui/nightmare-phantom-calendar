@@ -11,7 +11,7 @@ import rumps
 
 from drive_config import parse_config, read_config
 from scheduler import check_and_run_missed_sync, start_scheduler
-from sync_job import run_nightly_sync
+from sync_job import queue_run, run_nightly_sync
 
 
 class PhantomCalendarApp(rumps.App):
@@ -99,7 +99,7 @@ class PhantomCalendarApp(rumps.App):
     @rumps.clicked("Run now")
     def run_now(self, _):
         threading.Thread(
-            target=run_nightly_sync, kwargs={"app_ref": self}, daemon=True
+            target=queue_run, kwargs={"app_ref": self}, daemon=True
         ).start()
 
     # ------------------------------------------------------------------

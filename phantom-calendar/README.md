@@ -130,7 +130,8 @@ phantom-calendar/
     ├── test_calendar_writer.py  Calendar writer unit tests
     ├── test_sync_job.py      Nightly sync pipeline unit tests
     ├── test_scheduler.py     Scheduler unit tests
-    └── test_app_status.py    App status display and login item unit tests
+    ├── test_app_status.py    App status display and login item unit tests
+    └── test_on_demand_sync.py  On-demand sync queue unit tests
 ```
 
 ---
