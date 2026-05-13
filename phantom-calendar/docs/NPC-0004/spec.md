@@ -1,5 +1,5 @@
 ---
-spec_hash: ''
+spec_hash: 'c45b782ee969'
 ---
 
 # NPC-0004 Spec — Scheduler & Nightly Sync
