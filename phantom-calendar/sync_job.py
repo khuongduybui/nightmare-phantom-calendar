@@ -14,8 +14,13 @@ from popup import ConfirmationPopup
 _SYNC_LOCK = threading.Lock()
 
 
-def run_nightly_sync() -> None:
+def run_nightly_sync(app_ref=None) -> None:
     """Run the full nightly sync pipeline.
+
+    Args:
+        app_ref: Optional PhantomCalendarApp instance. If provided, its
+            set_syncing() and update_sync_state() methods are called to
+            update the menu bar icon and status items.
 
     Execution order:
         read_config → parse_config → get_msi_time_blocks → get_personal_events
@@ -30,6 +35,15 @@ def run_nightly_sync() -> None:
         print("[sync_job] Sync already in progress — skipping.", file=sys.stderr)
         return
 
+    if app_ref is not None:
+        try:
+            app_ref.set_syncing(True)
+        except Exception:
+            pass
+
+    alarm_time = None
+    failed = False
+
     try:
         raw = read_config()
         config = parse_config(raw)
@@ -39,6 +53,7 @@ def run_nightly_sync() -> None:
         personal_events = get_personal_events()
 
         result = compute_alarm(msi_blocks, personal_events, config)
+        alarm_time = result.get("alarm_time")
 
         popup_response = ConfirmationPopup(result).show()
 
@@ -50,6 +65,7 @@ def run_nightly_sync() -> None:
         )
 
     except Exception as exc:
+        failed = True
         msg = str(exc)
         print(f"[sync_job] ERROR: {msg}", file=sys.stderr)
         try:
@@ -59,3 +75,8 @@ def run_nightly_sync() -> None:
 
     finally:
         _SYNC_LOCK.release()
+        if app_ref is not None:
+            try:
+                app_ref.update_sync_state(alarm_time, failed)
+            except Exception:
+                pass

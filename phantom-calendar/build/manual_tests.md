@@ -34,6 +34,26 @@ Complete all prerequisites before running each section.
 
 ---
 
+## NPC-0005 — Menu Bar App
+
+### MT-5.AC10 — App registers as Login Item (AC10)
+
+**Feature:** NPC-0005
+
+**Prerequisites:** App launched at least once with valid credentials.
+
+**Steps:**
+1. Launch the app:
+   ```fish
+   uv run main.py
+   ```
+2. Open **System Settings → General → Login Items & Extensions**.
+3. Look for "main" or "Phantom Calendar" in the **Open at Login** list.
+
+**Pass criteria:** The app appears in the Login Items list. On next Mac login, it starts automatically (verify by logging out and back in).
+
+---
+
 ## NPC-0004 — Scheduler & Nightly Sync
 
 ### MT-4.AC1 — Popup appears automatically at 9pm (AC1, AC3)

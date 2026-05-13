@@ -92,6 +92,7 @@ See [build/manual_tests.md](build/manual_tests.md) for the full list of manual a
 | MT-1.4 | All packages present after install (`pip show`) |
 | MT-2.11 | Confirmation popup appears above all windows and claims focus |
 | MT-4.AC1 | Popup appears automatically at 9pm (or immediately on late startup) |
+| MT-5.AC10 | App registers as a Login Item and launches on Mac login |
 | MT-3.5 | ⏰ icon appears in macOS menu bar |
 | MT-3.6 | Dropdown shows "Run now" and "Quit" |
 | MT-3.7 | "Quit" exits cleanly with code 0 |
@@ -128,7 +129,8 @@ phantom-calendar/
     ├── test_popup.py         Confirmation popup unit tests
     ├── test_calendar_writer.py  Calendar writer unit tests
     ├── test_sync_job.py      Nightly sync pipeline unit tests
-    └── test_scheduler.py     Scheduler unit tests
+    ├── test_scheduler.py     Scheduler unit tests
+    └── test_app_status.py    App status display and login item unit tests
 ```
 
 ---
