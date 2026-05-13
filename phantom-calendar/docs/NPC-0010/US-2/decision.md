@@ -1,0 +1,1 @@
+- 2026-05-13 — Decision: Initial state files created for US-2. Impact: app.py, scheduler.py, tests/test_preferences_wiring.py.

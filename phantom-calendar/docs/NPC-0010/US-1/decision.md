@@ -1,0 +1,1 @@
+- 2026-05-13 — Decision: Initial state files created for US-1. Impact: preferences.py, tests/test_preferences.py.

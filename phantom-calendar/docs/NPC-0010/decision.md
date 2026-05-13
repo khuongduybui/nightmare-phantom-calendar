@@ -1,0 +1,4 @@
+- 2026-05-13 — Decision: Initial spec created for NPC-0010 (Preferences Window). Two stories: US-1 preferences.py, US-2 wiring + scheduler.
+- 2026-05-13 — Decision: tkinter is used (not osascript) because preferences open from a menu callback which runs on the main thread — safe for tkinter unlike sync pipeline.
+- 2026-05-13 — Decision: scheduler.py start_scheduler() extended with trigger_time parameter (default "21:00") to finally make the hardcoded hour configurable via preferences.
+- 2026-05-13 — Decision: Only 5 config keys in scope. More complex settings (recurring meetings, meeting types) remain Drive-config-only — preferences window is for day-to-day user settings.
