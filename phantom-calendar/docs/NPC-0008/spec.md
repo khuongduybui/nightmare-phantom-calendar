@@ -1,5 +1,5 @@
 ---
-spec_hash: ''
+spec_hash: 'ad248d298459'
 ---
 
 # NPC-0008 Spec — Persist Last Run State
