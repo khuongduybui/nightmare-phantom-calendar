@@ -1,0 +1,1 @@
+- 2026-05-12 — Decision: Initial state files created for US-1. Impact: sync_job.py (_show_popup, run_nightly_sync), tests/test_classification_ui.py.

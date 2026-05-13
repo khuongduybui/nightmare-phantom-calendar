@@ -1,0 +1,4 @@
+- 2026-05-12 — Decision: Initial spec created for NPC-0007 (Unknown Meeting Classification). Two sequential user stories: US-1 UI in _show_popup, US-2 Drive config write.
+- 2026-05-12 — Decision: Sequential choose-from-list dialogs (one per unknown block) used instead of live dropdown — osascript dialogs are modal/sequential, not reactive. Satisfies AC2 intent.
+- 2026-05-12 — Decision: Travel-time prep values ("travel+N") excluded from classification list — cannot resolve to minutes without location data.
+- 2026-05-12 — Decision: _show_popup() signature extended to _show_popup(result, config) to give it access to meeting_type_prep.

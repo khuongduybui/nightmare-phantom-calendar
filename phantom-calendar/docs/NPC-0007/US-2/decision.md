@@ -1,0 +1,1 @@
+- 2026-05-12 — Decision: Initial state files created for US-2. Impact: drive_config.py (append_recurring_meetings), sync_job.py (run_nightly_sync post-write call), tests/test_classification_write.py.
