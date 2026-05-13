@@ -10,13 +10,70 @@ import rumps
 from calendar_reader import get_msi_time_blocks, get_personal_events
 from calendar_writer import run_calendar_write
 from compute import compute_alarm
-from drive_config import parse_config, read_config
+from drive_config import append_recurring_meetings, parse_config, read_config
 
 _SYNC_LOCK = threading.Lock()
 _PENDING_RUN = threading.Event()
 
 
-def _show_popup(result: dict) -> dict:
+def _classify_unknown_blocks(
+    unknown_blocks: list, config: dict, current_alarm: "datetime | None"
+) -> "tuple[list, datetime | None]":
+    """Show a classification dialog for each unknown MSI block.
+
+    Returns (classifications, updated_alarm_time). Only integer-prep types are offered.
+    Travel-time entries (e.g. 'travel+10') are excluded.
+    """
+    from datetime import timedelta
+
+    meeting_type_prep = config.get("meeting_type_prep") or {}
+    options = [
+        (name, int(prep))
+        for name, prep in meeting_type_prep.items()
+        if isinstance(prep, int)
+    ]
+    if not options:
+        return [], current_alarm
+
+    option_names = [name for name, _ in options] + ["Skip (keep default)"]
+    classifications = []
+    alarm_time = current_alarm
+
+    for block in sorted(unknown_blocks, key=lambda b: b["start"]):
+        start_str = block["start"].strftime("%H:%M")
+        items_str = ", ".join(f'"{n}"' for n in option_names)
+        script = (
+            f'tell application "System Events" to set sel to '
+            f"choose from list {{{items_str}}} "
+            f'with prompt "Unknown block at {start_str} — what type of meeting is this?" '
+            f'default items {{"Skip (keep default)"}} '
+            f'with title "Phantom Calendar"\n'
+            f"if sel is false then\n"
+            f'  return "__cancelled__"\n'
+            f"else\n"
+            f"  return item 1 of sel\n"
+            f"end if"
+        )
+        out, _ = _osascript(script)
+        selected = out.strip()
+        if not selected or selected in ("__cancelled__", "Skip (keep default)"):
+            continue
+        prep_minutes = next((p for n, p in options if n == selected), None)
+        if prep_minutes is None:
+            continue
+        candidate_alarm = block["start"] - timedelta(minutes=prep_minutes)
+        if alarm_time is None or candidate_alarm < alarm_time:
+            alarm_time = candidate_alarm
+        classifications.append({
+            "start_time": block["start"].isoformat(),
+            "meeting_type": selected,
+            "prep_minutes": prep_minutes,
+        })
+
+    return classifications, alarm_time
+
+
+def _show_popup(result: dict, config: dict | None = None) -> dict:
     """Show the alarm confirmation dialog using osascript (works from any thread).
 
     Using tkinter (popup.py) crashes when called from a background thread inside
@@ -32,17 +89,30 @@ def _show_popup(result: dict) -> dict:
             '"No meetings found for tomorrow." buttons {"OK"} '
             'default button "OK" with title "Phantom Calendar"'
         )
-        return {"confirmed": False, "alarm_time": None, "skipped": True}
+        return {"confirmed": False, "alarm_time": None, "skipped": True, "classifications": []}
 
     alarm_time = result.get("alarm_time")
-    alarm_str = alarm_time.strftime("%H:%M") if alarm_time else "—"
     prep = result.get("prep_minutes", 0)
+    classifications: list = []
 
+    # Classification dialogs for unknown blocks (normal mode only, not baseline)
     unknown = result.get("unknown_blocks") or []
-    unknown_lines = "".join(
-        f"\\n⚠️ Unknown block at {b['start'].strftime('%H:%M')} — default prep applied"
-        for b in unknown
-    )
+    if unknown and config and not result.get("is_baseline"):
+        classifications, alarm_time = _classify_unknown_blocks(unknown, config, alarm_time)
+
+    alarm_str = alarm_time.strftime("%H:%M") if alarm_time else "—"
+
+    # Build unknown block summary lines
+    unknown_lines = ""
+    for b in unknown:
+        start = b["start"].strftime("%H:%M")
+        matched = next(
+            (c for c in classifications if c["start_time"] == b["start"].isoformat()), None
+        )
+        if matched:
+            unknown_lines += f"\\n✅ {start} → {matched['meeting_type']} ({matched['prep_minutes']} min)"
+        else:
+            unknown_lines += f"\\n⚠️ Unknown block at {start} — default prep applied"
 
     # Baseline — no new event needed
     if result.get("is_baseline"):
@@ -53,7 +123,7 @@ def _show_popup(result: dict) -> dict:
             f'✓ Matches baseline — no new event needed." '
             f'buttons {{"OK"}} default button "OK" with title "Phantom Calendar"'
         )
-        return {"confirmed": False, "alarm_time": None, "skipped": False}
+        return {"confirmed": False, "alarm_time": None, "skipped": False, "classifications": classifications}
 
     # Normal mode — ask to confirm/edit alarm time
     script = (
@@ -73,7 +143,7 @@ def _show_popup(result: dict) -> dict:
     out, rc = _osascript(script)
 
     if rc != 0 or "Write to Calendar" not in out:
-        return {"confirmed": False, "alarm_time": None, "skipped": True}
+        return {"confirmed": False, "alarm_time": None, "skipped": True, "classifications": classifications}
 
     time_str = out.split("||")[-1].strip() if "||" in out else alarm_str
     try:
@@ -82,7 +152,7 @@ def _show_popup(result: dict) -> dict:
     except (ValueError, AttributeError):
         confirmed_alarm = alarm_time
 
-    return {"confirmed": True, "alarm_time": confirmed_alarm, "skipped": False}
+    return {"confirmed": True, "alarm_time": confirmed_alarm, "skipped": False, "classifications": classifications}
 
 
 def _osascript(script: str) -> tuple[str, int]:
@@ -151,7 +221,7 @@ def run_nightly_sync(app_ref=None) -> None:
         result = compute_alarm(msi_blocks, personal_events, config)
         alarm_time = result.get("alarm_time")
 
-        popup_response = _show_popup(result)
+        popup_response = _show_popup(result, config)
 
         run_calendar_write(
             popup_response,
@@ -159,6 +229,17 @@ def run_nightly_sync(app_ref=None) -> None:
             meeting_name=result["first_meeting_name"],
             prep_minutes=result["prep_minutes"],
         )
+
+        # Write classifications back to Drive config (non-fatal)
+        if popup_response.get("confirmed") and popup_response.get("classifications"):
+            try:
+                append_recurring_meetings(popup_response["classifications"], config)
+                print(
+                    f"[sync_job] Wrote {len(popup_response['classifications'])} "
+                    "classification(s) to Drive config."
+                )
+            except Exception as exc:
+                print(f"[sync_job] WARNING: Could not write classifications to Drive — {exc}", file=sys.stderr)
 
     except Exception as exc:
         failed = True

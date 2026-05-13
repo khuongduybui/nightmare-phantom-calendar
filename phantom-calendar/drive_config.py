@@ -138,6 +138,59 @@ def write_config(content: str) -> None:
     ).execute()
 
 
+def append_recurring_meetings(classifications: list, config: dict) -> None:
+    """Append classified unknown blocks to recurring_meetings in the Drive config.
+
+    Each classification dict must have: start_time (ISO str), meeting_type (str),
+    prep_minutes (int). Builds a new recurring meeting entry and writes back to Drive.
+    """
+    from datetime import datetime, timedelta
+
+    existing_meetings = list(config.get("recurring_meetings") or [])
+
+    for c in classifications:
+        try:
+            start_dt = datetime.fromisoformat(c["start_time"])
+        except (ValueError, KeyError):
+            continue
+        start_str = start_dt.strftime("%H:%M")
+        end_dt = start_dt + timedelta(minutes=c["prep_minutes"])
+        end_str = end_dt.strftime("%H:%M")
+        meeting_type = c["meeting_type"]
+        prep = c["prep_minutes"]
+
+        new_entry = {
+            "name": f"{meeting_type} ({start_str})",
+            "start": start_str,
+            "end": end_str,
+            "days": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+            "prep_minutes": prep,
+            "notes": "Auto-classified by Phantom Calendar",
+        }
+        existing_meetings.append(new_entry)
+
+    # Build updated config dict and serialize back to YAML
+    updated_data = {
+        "calendars": {
+            "personal_id": config["personal_calendar_id"],
+            "msi_id": config["msi_calendar_id"],
+            "daily_run_time": config.get("daily_run_time", "21:00"),
+        },
+        "timezone": config.get("timezone", "America/New_York"),
+        "default_prep_minutes": config.get("default_prep_minutes", 30),
+        "baseline_event": {
+            "id": config.get("baseline_event_id", ""),
+            "title": config.get("baseline_event_title", ""),
+            "time": config.get("baseline_event_time", "09:25"),
+        },
+        "recurring_meetings": existing_meetings,
+        "meeting_type_prep": config.get("meeting_type_prep") or {},
+        "locations": config.get("locations") or {},
+        "client_overrides": config.get("client_overrides") or {},
+    }
+    write_config(yaml.dump(updated_data, default_flow_style=False, allow_unicode=True))
+
+
 def parse_config(raw: str) -> dict:
     """Parse YAML config string into a structured dict with sane defaults."""
     try:

@@ -33,6 +33,7 @@ MOCK_POPUP_RESPONSE = {
     "confirmed": True,
     "alarm_time": MagicMock(),
     "skipped": False,
+    "classifications": [],
 }
 
 
@@ -63,7 +64,7 @@ class TestRunNightlySync(unittest.TestCase):
         mock_msi.assert_called_once()
         mock_personal.assert_called_once()
         mock_compute.assert_called_once_with([], [], MOCK_CONFIG)
-        mock_popup.assert_called_once_with(MOCK_RESULT)
+        mock_popup.assert_called_once_with(MOCK_RESULT, MOCK_CONFIG)
         mock_write.assert_called_once_with(
             MOCK_POPUP_RESPONSE,
             MOCK_CONFIG,
