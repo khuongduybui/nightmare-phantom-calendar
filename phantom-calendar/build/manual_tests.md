@@ -34,6 +34,36 @@ Complete all prerequisites before running each section.
 
 ---
 
+## NPC-0004 — Scheduler & Nightly Sync
+
+### MT-4.AC1 — Popup appears automatically at 9pm (AC1, AC3)
+
+**Feature:** NPC-0004
+
+**Prerequisites:** All of NPC-0000 through NPC-0003 complete; valid `token.json`; `credentials.json` present; Drive config file accessible.
+
+**Steps (test at 9pm):**
+1. With venv active, from `phantom-calendar/`:
+   ```fish
+   uv run main.py
+   ```
+2. Wait for 21:00 local time.
+3. Observe whether the confirmation popup appears automatically without clicking anything.
+
+**Pass criteria:** Popup appears at 21:00 without user interaction. ⏰ icon remains in menu bar after popup is closed.
+
+**Steps (test missed sync):**
+1. Ensure the app is NOT running at 21:00.
+2. After 21:00, launch the app:
+   ```fish
+   uv run main.py
+   ```
+3. Observe whether the popup appears within a few seconds of launch.
+
+**Pass criteria:** Popup appears shortly after launch (missed sync detected and run immediately). App does not show the popup again at the next 21:00 — only the following day's trigger fires.
+
+---
+
 ## NPC-0002 — Confirmation Popup
 
 ### MT-2.11 — Popup appears in front and claims focus (AC1.11)
