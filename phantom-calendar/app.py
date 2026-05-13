@@ -1,5 +1,6 @@
 """Phantom Calendar macOS menu bar application."""
 
+import json
 import os
 import subprocess
 import sys
@@ -8,6 +9,9 @@ from datetime import datetime
 
 import pytz
 import rumps
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATE_FILE = os.path.join(BASE_DIR, ".phantom_state.json")
 
 from drive_config import parse_config, read_config
 from scheduler import check_and_run_missed_sync, start_scheduler
@@ -40,6 +44,9 @@ class PhantomCalendarApp(rumps.App):
             None,  # separator
             rumps.MenuItem("Run now", callback=self.run_now),
         ]
+
+        # Restore last run state from disk (non-fatal if missing/corrupt)
+        self._load_state()
 
         # Load config once at startup to get timezone for scheduler
         try:
@@ -91,6 +98,55 @@ class PhantomCalendarApp(rumps.App):
             self._last_alarm_item.title = "Alarm: none"
 
         self.title = "⏰❌" if failed else "⏰"
+        self._save_state()
+
+    # ------------------------------------------------------------------
+    # State persistence
+    # ------------------------------------------------------------------
+
+    def _save_state(self) -> None:
+        """Persist sync state to .phantom_state.json (non-fatal on error)."""
+        try:
+            state = {
+                "last_run_time": self._last_run_time.isoformat() if self._last_run_time else None,
+                "last_alarm_time": self._last_alarm_time.isoformat() if self._last_alarm_time else None,
+                "last_sync_failed": self._last_sync_failed,
+            }
+            with open(STATE_FILE, "w") as f:
+                json.dump(state, f)
+        except Exception as exc:
+            print(f"[app] WARNING: Could not save state — {exc}", file=sys.stderr)
+
+    def _load_state(self) -> None:
+        """Restore sync state from .phantom_state.json (non-fatal if missing/corrupt)."""
+        try:
+            with open(STATE_FILE) as f:
+                state = json.load(f)
+        except FileNotFoundError:
+            return
+        except Exception as exc:
+            print(f"[app] WARNING: Could not load state — {exc}", file=sys.stderr)
+            return
+
+        try:
+            raw_run = state.get("last_run_time")
+            raw_alarm = state.get("last_alarm_time")
+            self._last_run_time = datetime.fromisoformat(raw_run) if raw_run else None
+            self._last_alarm_time = datetime.fromisoformat(raw_alarm) if raw_alarm else None
+            self._last_sync_failed = bool(state.get("last_sync_failed", False))
+
+            if self._last_run_time:
+                self._last_run_item.title = f"Last run: {self._last_run_time.strftime('%-I:%M %p')}"
+            if self._last_alarm_time:
+                self._last_alarm_item.title = f"Alarm: {self._last_alarm_time.strftime('%-I:%M %p')}"
+            elif self._last_run_time:
+                # A sync ran but no alarm was set
+                self._last_alarm_item.title = "Alarm: none"
+
+            if self._last_sync_failed:
+                self.title = "⏰❌"
+        except Exception as exc:
+            print(f"[app] WARNING: Could not parse saved state — {exc}", file=sys.stderr)
 
     # ------------------------------------------------------------------
     # Menu actions

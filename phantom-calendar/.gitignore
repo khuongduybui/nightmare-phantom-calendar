@@ -2,6 +2,7 @@
 credentials.json
 token.json
 .drive_config_id
+.phantom_state.json
 
 # Python
 __pycache__/
