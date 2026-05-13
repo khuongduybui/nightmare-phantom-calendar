@@ -170,12 +170,12 @@ class PhantomCalendarApp(rumps.App):
     # ------------------------------------------------------------------
 
     def show_preferences(self, _):
-        """Open the preferences window in a background thread (single-instance guard).
+        """Open the preferences dialogs (single-instance guard).
 
-        tkinter's mainloop conflicts with AppKit's NSRunLoop on the main thread in rumps.
-        Running PreferencesWindow in a daemon thread sidesteps this — tkinter still
-        works because it's the only UI framework running in that thread.
+        Uses osascript dialogs (subprocess-based) which are safe from any thread.
+        Runs in a daemon thread so it doesn't block the rumps main thread.
         """
+
         if not _PREFS_OPEN.acquire(blocking=False):
             return  # already open
 
