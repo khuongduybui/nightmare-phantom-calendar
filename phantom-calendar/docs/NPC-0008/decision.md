@@ -1,0 +1,2 @@
+- 2026-05-12 — Decision: Initial spec created for NPC-0008. Single US-1 story. State file is JSON (stdlib, no new deps). Save is non-fatal. Load on startup before scheduler.
+- 2026-05-12 — Decision: _save_state() called from update_sync_state() rather than from sync_job.py directly, keeping state persistence inside app.py and requiring no changes to sync_job.py.

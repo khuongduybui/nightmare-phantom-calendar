@@ -1,0 +1,1 @@
+- 2026-05-12 — Decision: Initial state files created for US-1. Impact: app.py, .gitignore, tests/test_state_persistence.py.
