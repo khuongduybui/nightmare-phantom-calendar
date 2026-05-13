@@ -1,1 +1,2 @@
 - 2026-05-12 — Decision: Initial state files created for US-1 (Core Write Operations). Impact: calendar_writer.py (partial), tests/test_calendar_writer.py (TestCoreWriteOps).
+- 2026-05-12 — Decision: Implemented both US-1 and US-2 in a single calendar_writer.py file (all 8 functions). US-2 baseline+orchestration functions were straightforward extensions of US-1 patterns. Single file avoids import complexity.
