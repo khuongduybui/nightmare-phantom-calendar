@@ -22,7 +22,6 @@ Deferred items from MVP 2 feature definition.
 - Undo / manual deletion of a written alarm outside of a sync run
 
 ## Menu Bar App (NPC-0005)
-- Custom icon design
 - Preferences / settings window
 
 ## On-Demand Sync (NPC-0006)
