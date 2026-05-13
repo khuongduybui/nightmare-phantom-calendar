@@ -146,7 +146,7 @@ def get_drive_service():
 import io
 from auth import get_drive_service
 
-CONFIG_FILE_ID = '1nZ8-G5vwi9O8r4hAmbBS9zl55cVVjXz6'
+CONFIG_FILE_ID = '1nPSl33iRhs5Jnv1SxNxdc9qHoID5J1UF'
 
 
 def read_config() -> str:

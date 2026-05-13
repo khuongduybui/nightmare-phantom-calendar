@@ -12,7 +12,7 @@ status: PASS
 **PASS** ✓
 
 ### AC1.2 — CONFIG_FILE_ID env-configurable
-**PASS** — `CONFIG_FILE_ID = os.environ.get('PHANTOM_CONFIG_FILE_ID', '1nZ8-G5vwi9O8r4hAmbBS9zl55cVVjXz6')` ✓
+**PASS** — `CONFIG_FILE_ID = os.environ.get('PHANTOM_CONFIG_FILE_ID', '1nPSl33iRhs5Jnv1SxNxdc9qHoID5J1UF')` ✓
 Covered by `test_config_file_id_uses_env_var` — PASSED ✓
 
 ### AC1.3 — DEFAULT_CONFIG_YAML module-level constant

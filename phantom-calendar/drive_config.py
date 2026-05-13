@@ -26,7 +26,7 @@ def _load_config_file_id() -> str:
             stored = f.read().strip()
             if stored:
                 return stored
-    return "1nZ8-G5vwi9O8r4hAmbBS9zl55cVVjXz6"
+    return "1nPSl33iRhs5Jnv1SxNxdc9qHoID5J1UF"
 
 
 def _save_config_file_id(file_id: str) -> None:

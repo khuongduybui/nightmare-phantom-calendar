@@ -81,7 +81,7 @@ Values that involve travel time (`travel+N`) are stored as strings; integer-only
 
 ### Mismatches Between feature.md and project.md
 
-1. **CONFIG_FILE_ID hardcoded in project.md**: Spec: `os.environ.get('PHANTOM_CONFIG_FILE_ID', '1nZ8-G5vwi9O8r4hAmbBS9zl55cVVjXz6')`. (feature.md AC2)
+1. **CONFIG_FILE_ID hardcoded in project.md**: Spec: `os.environ.get('PHANTOM_CONFIG_FILE_ID', '1nPSl33iRhs5Jnv1SxNxdc9qHoID5J1UF')`. (feature.md AC2)
 
 2. **project.md uses pipe-delimited markdown parsing**: Replaced by `yaml.safe_load()`. All values come from YAML — no value is hardcoded without a file override.
 
@@ -118,7 +118,7 @@ Prerequisites for live API verification only. Unit tests mock all API calls.
 **Acceptance Criteria:**
 
 - AC1.1: `drive_config.py` exists at project root.
-- AC1.2: `CONFIG_FILE_ID = os.environ.get('PHANTOM_CONFIG_FILE_ID', '1nZ8-G5vwi9O8r4hAmbBS9zl55cVVjXz6')` is a module-level constant. (feature.md AC2)
+- AC1.2: `CONFIG_FILE_ID = os.environ.get('PHANTOM_CONFIG_FILE_ID', '1nPSl33iRhs5Jnv1SxNxdc9qHoID5J1UF')` is a module-level constant. (feature.md AC2)
 - AC1.3: `read_config() -> str` calls `auth.get_drive_service()`, executes `files().get_media(fileId=CONFIG_FILE_ID)`, returns content decoded as `str`. (feature.md AC1)
 - AC1.4: `parse_config(raw: str) -> dict` returns a dict with these keys and defaults when absent from `raw`:
   - `personal_calendar_id`: `'duykbui1989@gmail.com'`
@@ -232,7 +232,7 @@ Prerequisites for live API verification only. Unit tests mock all API calls.
 - All-day events (missing `dateTime` key) silently skipped.
 - `auth.py` must not be modified.
 - All API calls mocked in unit tests — no live network calls in pytest.
-- `CONFIG_FILE_ID` default `'1nZ8-G5vwi9O8r4hAmbBS9zl55cVVjXz6'` — do not change this value.
+- `CONFIG_FILE_ID` default `'1nPSl33iRhs5Jnv1SxNxdc9qHoID5J1UF'` — do not change this value.
 - Config file format is YAML. `parse_config()` uses `yaml.safe_load()`. No regex-based markdown parsing.
 - All configurable values come from the YAML file; sane defaults are fallback only — no value is permanently hardcoded.
 
