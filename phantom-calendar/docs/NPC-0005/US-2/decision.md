@@ -1,0 +1,1 @@
+- 2026-05-12 — Decision: Initial state files created for US-2 (Login Item Registration). Impact: app.py (_register_login_item), tests/test_app_status.py (login failure test).

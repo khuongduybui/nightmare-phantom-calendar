@@ -1,0 +1,1 @@
+- 2026-05-12 — Decision: Initial state files created for US-1 (Status Menu Items + Icon States). Impact: app.py, sync_job.py, tests/test_app_status.py.
