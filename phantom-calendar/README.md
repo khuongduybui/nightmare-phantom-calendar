@@ -126,6 +126,7 @@ phantom-calendar/
 ├── calendar_reader.py    Reads MSI time blocks and Personal calendar events
 ├── compute.py            Matches meetings and computes alarm time
 ├── popup.py              Confirmation popup (tkinter) — user reviews and confirms alarm
+├── preferences.py        Preferences window (tkinter) — edit trigger time, timezone, prep minutes, calendar IDs
 ├── calendar_writer.py    Writes alarm event to Google Calendar; overrides baseline occurrence
 ├── sync_job.py           Nightly sync pipeline (config → compute → popup → write), with lock
 ├── scheduler.py          APScheduler 21:00 daily trigger and missed-sync detection

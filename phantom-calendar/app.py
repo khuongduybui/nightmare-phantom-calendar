@@ -13,9 +13,12 @@ import rumps
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(BASE_DIR, ".phantom_state.json")
 
-from drive_config import parse_config, read_config
+from drive_config import parse_config, read_config, write_config
+from preferences import PreferencesWindow
 from scheduler import check_and_run_missed_sync, start_scheduler
 from sync_job import queue_run, run_nightly_sync
+
+_PREFS_OPEN = threading.Lock()
 
 
 class PhantomCalendarApp(rumps.App):
@@ -51,27 +54,30 @@ class PhantomCalendarApp(rumps.App):
             self._last_run_item,
             self._last_alarm_item,
             None,  # separator
+            rumps.MenuItem("Preferences…", callback=self.show_preferences),
             rumps.MenuItem("Run now", callback=self.run_now),
         ]
 
         # Restore last run state from disk (non-fatal if missing/corrupt)
         self._load_state()
 
-        # Load config once at startup to get timezone for scheduler
+        # Load config once at startup to get timezone and trigger time for scheduler
+        self._trigger_time: str = "21:00"
         try:
             config = parse_config(read_config())
             self._timezone_str = config.get("timezone", "America/New_York")
+            self._trigger_time = config.get("daily_run_time", "21:00")
         except Exception as exc:
             print(f"[app] WARNING: Could not load config at startup — {exc}", file=sys.stderr)
 
         # Register as Login Item on first launch (non-fatal)
         self._register_login_item()
 
-        # Run a missed sync if 9pm has already passed today
+        # Run a missed sync if trigger time has already passed today
         check_and_run_missed_sync(self._timezone_str)
 
         # Start the background scheduler
-        self._scheduler = start_scheduler(self._timezone_str)
+        self._scheduler = start_scheduler(self._timezone_str, self._trigger_time)
 
         # Icon is already set via self.icon= in _load_state() or defaults to ICON_IDLE from super().__init__
 
@@ -162,6 +168,75 @@ class PhantomCalendarApp(rumps.App):
     # ------------------------------------------------------------------
     # Menu actions
     # ------------------------------------------------------------------
+
+    @rumps.clicked("Preferences…")
+    def show_preferences(self, _):
+        """Open the preferences window (single-instance guard)."""
+        if not _PREFS_OPEN.acquire(blocking=False):
+            return  # already open
+        try:
+            try:
+                config = parse_config(read_config())
+            except Exception as exc:
+                print(f"[app] WARNING: Could not load config for prefs — {exc}", file=sys.stderr)
+                config = {}
+            result = PreferencesWindow(config).show()
+            if result is not None:
+                self._save_preferences(result)
+        finally:
+            _PREFS_OPEN.release()
+
+    def _save_preferences(self, updated: dict) -> None:
+        """Write updated settings to Drive config and restart the scheduler."""
+        try:
+            import yaml
+            config = parse_config(read_config())
+            # Update only the 5 preference fields
+            config["personal_calendar_id"] = updated["personal_calendar_id"]
+            config["msi_calendar_id"] = updated["msi_calendar_id"]
+            config["timezone"] = updated["timezone"]
+            config["default_prep_minutes"] = updated["default_prep_minutes"]
+            config["daily_run_time"] = updated["daily_run_time"]
+            # Rebuild YAML preserving all other fields
+            data = {
+                "calendars": {
+                    "personal_id": config["personal_calendar_id"],
+                    "msi_id": config["msi_calendar_id"],
+                    "daily_run_time": config["daily_run_time"],
+                },
+                "timezone": config["timezone"],
+                "default_prep_minutes": config["default_prep_minutes"],
+                "baseline_event": {
+                    "id": config.get("baseline_event_id", ""),
+                    "title": config.get("baseline_event_title", ""),
+                    "time": config.get("baseline_event_time", "09:25"),
+                },
+                "recurring_meetings": config.get("recurring_meetings") or [],
+                "meeting_type_prep": config.get("meeting_type_prep") or {},
+                "locations": config.get("locations") or {},
+                "client_overrides": config.get("client_overrides") or {},
+            }
+            write_config(yaml.dump(data, default_flow_style=False, allow_unicode=True))
+            self._restart_scheduler(updated["timezone"], updated["daily_run_time"])
+            print("[app] Preferences saved and scheduler restarted.")
+        except Exception as exc:
+            print(f"[app] ERROR: Could not save preferences — {exc}", file=sys.stderr)
+            try:
+                rumps.notification("Phantom Calendar", "", f"Could not save preferences: {exc}")
+            except Exception:
+                pass
+
+    def _restart_scheduler(self, timezone_str: str, trigger_time: str) -> None:
+        """Shut down the current scheduler and start a new one with updated settings."""
+        if hasattr(self, "_scheduler") and self._scheduler:
+            try:
+                self._scheduler.shutdown(wait=False)
+            except Exception:
+                pass
+        self._timezone_str = timezone_str
+        self._trigger_time = trigger_time
+        self._scheduler = start_scheduler(timezone_str, trigger_time)
+        print(f"[app] Scheduler restarted: {trigger_time} {timezone_str}")
 
     @rumps.clicked("Run now")
     def run_now(self, _):

@@ -10,19 +10,25 @@ from apscheduler.triggers.cron import CronTrigger
 from sync_job import run_nightly_sync
 
 
-def start_scheduler(timezone_str: str) -> BackgroundScheduler:
-    """Start and return a BackgroundScheduler with a daily 21:00 cron trigger.
+def start_scheduler(timezone_str: str, trigger_time: str = "21:00") -> BackgroundScheduler:
+    """Start and return a BackgroundScheduler with a configurable daily cron trigger.
 
     Args:
         timezone_str: Timezone name (e.g. 'America/New_York') for the cron trigger.
+        trigger_time: HH:MM string for the daily trigger time (default '21:00').
 
     Returns:
         The started BackgroundScheduler instance.
     """
+    try:
+        hh, mm = map(int, trigger_time.split(":"))
+    except (ValueError, AttributeError):
+        hh, mm = 21, 0  # fallback to default
+
     scheduler = BackgroundScheduler()
     scheduler.add_job(
         run_nightly_sync,
-        trigger=CronTrigger(hour=21, minute=0, timezone=timezone_str),
+        trigger=CronTrigger(hour=hh, minute=mm, timezone=timezone_str),
         id="nightly_sync",
         replace_existing=True,
     )
