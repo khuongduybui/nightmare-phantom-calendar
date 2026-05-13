@@ -1,12 +1,12 @@
 ---
-phase: Implementer
+phase: Story-Review
 spec_hash: 'c9c39c139945'
-status: NotStarted
+status: StoryReviewPassed
 blockers: None
 ---
 
 ## Last Run
-- N/A
+- 2026-05-12: Implemented, QA'd, Story-Reviewed US-1 — added _PENDING_RUN, queue_run() to sync_job.py; updated app.py run_now; created tests/test_on_demand_sync.py. 6/6 tests; 99/99 full suite.
 
 ## Changes Since Last Iteration
 - State files initialized by Planner.
