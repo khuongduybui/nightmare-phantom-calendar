@@ -1,6 +1,6 @@
 ---
 phase: Implementer
-spec_hash: ''
+spec_hash: 'fc12be59cb39'
 status: NotStarted
 blockers: US-1
 ---

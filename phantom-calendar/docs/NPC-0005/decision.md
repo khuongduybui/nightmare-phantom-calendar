@@ -2,3 +2,4 @@
 - 2026-05-12 — Decision: Chose callback-based approach (app_ref parameter to run_nightly_sync) over module-global or circular-import approach to pass sync state updates back to the app. Simpler and testable.
 - 2026-05-12 — Decision: Icon states use rumps title string (emoji) rather than custom .icns files. Fast to implement, readable, sufficient for MVP.
 - 2026-05-12 — Decision: Login Item registration is non-fatal — if osascript fails, log to stderr and continue. App still runs without being a Login Item.
+- 2026-05-12 — Decision: Spec approved by human. spec_hash: fc12be59cb39. Impact: docs/NPC-0005/spec.md approved; per-story state files updated.

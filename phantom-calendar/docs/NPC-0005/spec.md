@@ -1,5 +1,5 @@
 ---
-spec_hash: ''
+spec_hash: 'fc12be59cb39'
 ---
 
 # NPC-0005 Spec — Menu Bar App
