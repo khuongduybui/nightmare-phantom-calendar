@@ -45,7 +45,7 @@ class TestRunNightlySync(unittest.TestCase):
             sync_job._SYNC_LOCK.release()
 
     @patch("sync_job.run_calendar_write")
-    @patch("sync_job.ConfirmationPopup")
+    @patch("sync_job._show_popup", return_value=MOCK_POPUP_RESPONSE)
     @patch("sync_job.compute_alarm", return_value=MOCK_RESULT)
     @patch("sync_job.get_personal_events", return_value=[])
     @patch("sync_job.get_msi_time_blocks", return_value=[])
@@ -54,10 +54,8 @@ class TestRunNightlySync(unittest.TestCase):
     def test_run_nightly_sync_calls_pipeline_in_order(
         self,
         mock_read, mock_parse, mock_msi, mock_personal,
-        mock_compute, mock_popup_cls, mock_write,
+        mock_compute, mock_popup, mock_write,
     ):
-        mock_popup_cls.return_value.show.return_value = MOCK_POPUP_RESPONSE
-
         sync_job.run_nightly_sync()
 
         mock_read.assert_called_once()
@@ -65,8 +63,7 @@ class TestRunNightlySync(unittest.TestCase):
         mock_msi.assert_called_once()
         mock_personal.assert_called_once()
         mock_compute.assert_called_once_with([], [], MOCK_CONFIG)
-        mock_popup_cls.assert_called_once_with(MOCK_RESULT)
-        mock_popup_cls.return_value.show.assert_called_once()
+        mock_popup.assert_called_once_with(MOCK_RESULT)
         mock_write.assert_called_once_with(
             MOCK_POPUP_RESPONSE,
             MOCK_CONFIG,
@@ -87,7 +84,7 @@ class TestRunNightlySync(unittest.TestCase):
 
     @patch("sync_job.rumps")
     @patch("sync_job.run_calendar_write")
-    @patch("sync_job.ConfirmationPopup")
+    @patch("sync_job._show_popup")
     @patch("sync_job.compute_alarm")
     @patch("sync_job.get_personal_events", return_value=[])
     @patch("sync_job.get_msi_time_blocks", return_value=[])
@@ -96,7 +93,7 @@ class TestRunNightlySync(unittest.TestCase):
     def test_run_nightly_sync_surfaces_error_on_exception(
         self,
         mock_read, mock_parse, mock_msi, mock_personal,
-        mock_compute, mock_popup_cls, mock_write, mock_rumps,
+        mock_compute, mock_popup, mock_write, mock_rumps,
     ):
         # Should NOT raise
         sync_job.run_nightly_sync()
@@ -108,7 +105,7 @@ class TestRunNightlySync(unittest.TestCase):
         mock_write.assert_not_called()
 
     @patch("sync_job.run_calendar_write")
-    @patch("sync_job.ConfirmationPopup")
+    @patch("sync_job._show_popup", return_value=MOCK_POPUP_RESPONSE)
     @patch("sync_job.compute_alarm", return_value=MOCK_RESULT)
     @patch("sync_job.get_personal_events", return_value=[])
     @patch("sync_job.get_msi_time_blocks", return_value=[])
@@ -117,10 +114,8 @@ class TestRunNightlySync(unittest.TestCase):
     def test_run_calendar_write_called_with_meeting_name_and_prep(
         self,
         mock_read, mock_parse, mock_msi, mock_personal,
-        mock_compute, mock_popup_cls, mock_write,
+        mock_compute, mock_popup, mock_write,
     ):
-        mock_popup_cls.return_value.show.return_value = MOCK_POPUP_RESPONSE
-
         sync_job.run_nightly_sync()
 
         _, kwargs = mock_write.call_args
@@ -129,7 +124,7 @@ class TestRunNightlySync(unittest.TestCase):
 
     @patch("sync_job.rumps")
     @patch("sync_job.run_calendar_write")
-    @patch("sync_job.ConfirmationPopup")
+    @patch("sync_job._show_popup", return_value=MOCK_POPUP_RESPONSE)
     @patch("sync_job.compute_alarm", return_value=MOCK_RESULT)
     @patch("sync_job.get_personal_events", return_value=[])
     @patch("sync_job.get_msi_time_blocks", return_value=[])
@@ -138,9 +133,8 @@ class TestRunNightlySync(unittest.TestCase):
     def test_lock_released_after_successful_run(
         self,
         mock_read, mock_parse, mock_msi, mock_personal,
-        mock_compute, mock_popup_cls, mock_write, mock_rumps,
+        mock_compute, mock_popup, mock_write, mock_rumps,
     ):
-        mock_popup_cls.return_value.show.return_value = MOCK_POPUP_RESPONSE
         sync_job.run_nightly_sync()
         # Lock must be released so a second call can proceed
         self.assertFalse(sync_job._SYNC_LOCK.locked())

@@ -51,7 +51,7 @@ class TestPendingRunExecution(unittest.TestCase):
             sync_job._SYNC_LOCK.release()
 
     @patch("sync_job.run_calendar_write")
-    @patch("sync_job.ConfirmationPopup")
+    @patch("sync_job._show_popup", return_value={"confirmed": False, "alarm_time": None, "skipped": True})
     @patch(
         "sync_job.compute_alarm",
         return_value={
@@ -81,14 +81,9 @@ class TestPendingRunExecution(unittest.TestCase):
         mock_msi,
         mock_personal,
         mock_compute,
-        mock_popup_cls,
+        mock_popup,
         mock_write,
     ):
-        mock_popup_cls.return_value.show.return_value = {
-            "confirmed": False,
-            "alarm_time": None,
-            "skipped": True,
-        }
         call_count = {"n": 0}
         original_sync = sync_job.run_nightly_sync
 
