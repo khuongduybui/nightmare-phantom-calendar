@@ -93,6 +93,21 @@ class PreferencesWindow:
                 return None  # user cancelled
             values[key] = val
 
+        # Normalize trigger time: accept decimal hours (e.g. 22.5 → 22:30, 9 → 09:00)
+        raw_time = values["daily_run_time"].strip()
+        if not re.match(r"^\d{1,2}:\d{2}$", raw_time):
+            try:
+                hours_float = float(raw_time)
+                hh_int = int(hours_float)
+                mm_int = round((hours_float - hh_int) * 60)
+                if mm_int == 60:
+                    hh_int += 1
+                    mm_int = 0
+                raw_time = f"{hh_int:02d}:{mm_int:02d}"
+            except ValueError:
+                pass
+        values["daily_run_time"] = raw_time
+
         # Validate trigger time
         if not re.match(r"^\d{2}:\d{2}$", values["daily_run_time"]):
             _osascript(
