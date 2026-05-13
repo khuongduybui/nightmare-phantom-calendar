@@ -1,5 +1,5 @@
 ---
-spec_hash: ''
+spec_hash: '0cff6720f5bf'
 ---
 
 # NPC-0007 Spec — Unknown Meeting Classification

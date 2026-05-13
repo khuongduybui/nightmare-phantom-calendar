@@ -2,3 +2,4 @@
 - 2026-05-12 — Decision: Sequential choose-from-list dialogs (one per unknown block) used instead of live dropdown — osascript dialogs are modal/sequential, not reactive. Satisfies AC2 intent.
 - 2026-05-12 — Decision: Travel-time prep values ("travel+N") excluded from classification list — cannot resolve to minutes without location data.
 - 2026-05-12 — Decision: _show_popup() signature extended to _show_popup(result, config) to give it access to meeting_type_prep.
+- 2026-05-12 — Decision: Spec approved by human. spec_hash: 0cff6720f5bf. Impact: docs/NPC-0007/spec.md approved; per-story state files updated.
