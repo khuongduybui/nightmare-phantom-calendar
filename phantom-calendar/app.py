@@ -50,9 +50,12 @@ class PhantomCalendarApp(rumps.App):
         self._last_run_item = rumps.MenuItem("Last run: —")
         self._last_alarm_item = rumps.MenuItem("Alarm: —")
 
+        self._sync_time_item = rumps.MenuItem("Sync: 21:00")
+
         self.menu = [
             self._last_run_item,
             self._last_alarm_item,
+            self._sync_time_item,
             None,  # separator
             rumps.MenuItem("Preferences…", callback=self.show_preferences),
             rumps.MenuItem("Run now", callback=self.run_now),
@@ -67,6 +70,7 @@ class PhantomCalendarApp(rumps.App):
             config = parse_config(read_config())
             self._timezone_str = config.get("timezone", "America/New_York")
             self._trigger_time = config.get("daily_run_time", "21:00")
+            self._sync_time_item.title = f"Sync: {self._trigger_time}"
         except Exception as exc:
             print(f"[app] WARNING: Could not load config at startup — {exc}", file=sys.stderr)
 
@@ -226,6 +230,7 @@ class PhantomCalendarApp(rumps.App):
             }
             write_config(yaml.dump(data, default_flow_style=False, allow_unicode=True))
             self._restart_scheduler(updated["timezone"], updated["daily_run_time"])
+            self._sync_time_item.title = f"Sync: {updated['daily_run_time']}"
             print("[app] Preferences saved and scheduler restarted.")
         except Exception as exc:
             print(f"[app] ERROR: Could not save preferences — {exc}", file=sys.stderr)
