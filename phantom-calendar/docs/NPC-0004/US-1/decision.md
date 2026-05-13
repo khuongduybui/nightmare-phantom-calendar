@@ -1,1 +1,2 @@
 - 2026-05-12 — Decision: Initial state files created for US-1 (Sync Job Module). Impact: sync_job.py, tests/test_sync_job.py.
+- 2026-05-12 — Decision: rumps.notification() call wrapped in its own try/except inside the error handler so a notification failure never masks the original error log to stderr.
