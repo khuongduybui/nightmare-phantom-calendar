@@ -108,6 +108,7 @@ phantom-calendar/
 ├── calendar_reader.py    Reads MSI time blocks and Personal calendar events
 ├── compute.py            Matches meetings and computes alarm time
 ├── popup.py              Confirmation popup (tkinter) — user reviews and confirms alarm
+├── calendar_writer.py    Writes alarm event to Google Calendar; overrides baseline occurrence
 ├── config.yaml           Default configuration (committed; auto-pushed to Drive)
 ├── requirements.txt      Pinned runtime dependencies
 ├── .gitignore            Excludes credentials.json, token.json, .venv/, etc.
@@ -121,7 +122,8 @@ phantom-calendar/
     ├── test_drive_config.py  Drive config unit tests
     ├── test_calendar_reader.py  Calendar reader unit tests
     ├── test_compute.py       Compute module unit tests
-    └── test_popup.py         Confirmation popup unit tests
+    ├── test_popup.py         Confirmation popup unit tests
+    └── test_calendar_writer.py  Calendar writer unit tests
 ```
 
 ---
