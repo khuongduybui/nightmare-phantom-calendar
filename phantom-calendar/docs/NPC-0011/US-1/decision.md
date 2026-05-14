@@ -1,0 +1,1 @@
+- 2026-05-14 — Decision: Initial state files created for US-1. Impact: compute.py, drive_config.py, tests/test_travel_time.py (TestTravelTimeResolution).

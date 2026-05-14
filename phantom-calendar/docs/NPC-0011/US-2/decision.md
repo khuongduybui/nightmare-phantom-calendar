@@ -1,0 +1,1 @@
+- 2026-05-14 — Decision: Initial state files created for US-2. Impact: preferences.py, tests/test_travel_time.py (TestLocationsEditor).

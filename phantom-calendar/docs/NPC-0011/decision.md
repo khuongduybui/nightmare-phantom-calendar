@@ -1,0 +1,4 @@
+- 2026-05-14 — Decision: Initial spec created for NPC-0011. Two parallel stories: US-1 (compute + parse_config), US-2 (preferences locations editor).
+- 2026-05-14 — Decision: resolve_prep_minutes() is a pure exported function (not inline in compute_alarm) so it can be unit-tested in isolation and reused.
+- 2026-05-14 — Decision: When meeting_type maps to "travel+N", the N is the fixed overhead (e.g. buffer time), not travel time. Travel time comes from locations[]. Total = travel_minutes + N. This avoids double-counting travel.
+- 2026-05-14 — Decision: Unknown location (location key present but not in locations dict) falls back to default_prep_minutes rather than crashing or silently using 0.
