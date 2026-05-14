@@ -22,7 +22,7 @@ Deferred items from MVP 2 feature definition.
 - Undo / manual deletion of a written alarm outside of a sync run
 
 ## Menu Bar App (NPC-0005)
-- Preferences / settings window
+- Preferences / settings window instead of question-by-question popup
 
 ## On-Demand Sync (NPC-0006)
 - Keyboard shortcut / hotkey trigger
@@ -34,7 +34,7 @@ Deferred items from MVP 2 feature definition.
 ## Future (MVP 3+)
 - Location-based travel time: use `locations` config (location name → travel minutes) to adjust prep time based on meeting location
 - Client-specific prep overrides: use `client_overrides` config (client name → prep minutes) to override default prep per client
-- Replace tkinter popup with native SwiftUI notification
+- Replace osascript popup with native SwiftUI notification
 - Google Maps API for live travel time based on event location
 - Watch for calendar change events and auto-recompute
 - Config editor UI inside the app (instead of editing Google Drive directly)
