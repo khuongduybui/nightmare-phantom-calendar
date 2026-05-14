@@ -2,5 +2,6 @@
 - 2026-05-14 — Decision: resolve_prep_minutes() is a pure exported function (not inline in compute_alarm) so it can be unit-tested in isolation and reused.
 - 2026-05-14 — Decision: When meeting_type maps to "travel+N", the N is the fixed overhead (e.g. buffer time), not travel time. Travel time comes from locations[]. Total = travel_minutes + N. This avoids double-counting travel.
 - 2026-05-14 — Decision: Unknown location (not in locations dict) falls back to Home (0 travel) + fixed_minutes rather than default_prep_minutes. Home is always present (injected by parse_config if absent).
+- 2026-05-14 — Decision: Spec approved by human. spec_hash: a94c490da21a. Impact: docs/NPC-0011/spec.md approved; per-story state files updated.
 - 2026-05-14 — Decision: Personal calendar events use the location field from the Google Calendar API directly. Empty/absent location defaults to 'Home' (0 travel).
 - 2026-05-14 — Decision: MSI blocks location is asked during NPC-0007 classification flow (in sync_job._classify_unknown_blocks) and stored on the recurring meeting entry written to Drive config. This extends NPC-0007 rather than creating a separate flow.

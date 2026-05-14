@@ -1,6 +1,6 @@
 ---
 phase: Planner
-spec_hash: ''
+spec_hash: 'a94c490da21a'
 status: SpecDraft
 ---
 

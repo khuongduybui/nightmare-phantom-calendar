@@ -1,5 +1,5 @@
 ---
-spec_hash: ''
+spec_hash: 'a94c490da21a'
 ---
 
 # NPC-0011 Spec — Location-Based Travel Time
