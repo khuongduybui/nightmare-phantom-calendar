@@ -12,9 +12,26 @@ spec_hash: ''
 - `config["meeting_type_prep"]` contains `"travel+N"` strings that are never resolved.
 - `compute.py` uses `matched["prep_minutes"]` directly from recurring meeting config — integer only.
 - Recurring meeting entries have `name`, `start`, `end`, `days`, `prep_minutes`, `notes` — no `location` or `meeting_type`.
+- `calendar_reader.get_personal_events()` currently returns `{"title", "start", "end"}` — does NOT read the `location` field from the event.
 
-### New config shape (optional fields on recurring meetings)
+### Location source by calendar type
 
+| Calendar | Location source | Fallback |
+|---|---|---|
+| **MSI (work)** | Unknown (freeBusyReader only — no event details) | Ask user during classification (NPC-0007 flow); stored on recurring meeting entry |
+| **Personal** | Google Calendar `location` field on the event | `"Home"` (0 min travel) if absent or not in `config["locations"]` |
+
+### Config additions
+
+`locations` dict (name → travel minutes in minutes) — `"Home"` always defaults to 0:
+```yaml
+locations:
+  Home: 0          # default fallback; always present
+  Office: 25
+  Client HQ: 45
+```
+
+Optional fields on recurring meeting entries (MSI, set during NPC-0007 classification):
 ```yaml
 recurring_meetings:
   - name: Client Onboarding
@@ -23,49 +40,60 @@ recurring_meetings:
     days: [Mon, Tue, Wed, Thu, Fri]
     prep_minutes: 30        # used as fallback if location not found
     location: Client HQ     # optional — maps to config["locations"]
-    meeting_type: "New client"  # optional — used to get fixed_minutes from meeting_type_prep
+    meeting_type: "New client"
     notes: ""
-
-locations:
-  Office: 25
-  Client HQ: 45
-  Home: 0
 ```
 
 ### Prep time resolution algorithm
 
 ```
-resolve_prep(meeting, config) -> int:
-    location = meeting.get("location")
-    meeting_type = meeting.get("meeting_type")
+resolve_prep(meeting_or_event, config, event_location=None) -> int:
+    # event_location: location string from personal calendar API, or None
 
-    if location:
-        travel_minutes = config["locations"].get(location)
-        if travel_minutes is None:
-            return config["default_prep_minutes"]  # unknown location → default
-        # Get fixed_minutes from meeting_type or prep_minutes
+    # Determine location name
+    if event_location is not None:
+        # Personal calendar event with explicit location
+        location_name = event_location.strip() or "Home"
+    else:
+        # MSI recurring meeting — use stored location field
+        location_name = meeting_or_event.get("location") or None
+
+    if location_name:
+        travel_minutes = config["locations"].get(location_name,
+                         config["locations"].get("Home", 0))
+        meeting_type = meeting_or_event.get("meeting_type")
         if meeting_type:
-            type_val = config["meeting_type_prep"].get(meeting_type, meeting.get("prep_minutes", 0))
+            type_val = config["meeting_type_prep"].get(meeting_type, 0)
         else:
-            type_val = meeting.get("prep_minutes", 0)
-        # Parse "travel+N" or int
+            type_val = meeting_or_event.get("prep_minutes", 0)
         fixed = _parse_fixed(type_val)
         return travel_minutes + fixed
     else:
-        # No location: use prep_minutes as-is (existing behavior)
-        return meeting.get("prep_minutes", config["default_prep_minutes"])
+        return meeting_or_event.get("prep_minutes",
+               config.get("default_prep_minutes", 30))
 
 _parse_fixed(val) -> int:
-    if isinstance(val, int):
-        return val
-    if isinstance(val, str) and val.startswith("travel+"):
-        return int(val.split("+")[1])
+    if isinstance(val, int): return val
+    if isinstance(val, str) and val.startswith("travel+"): return int(val.split("+")[1])
     return 0
 ```
 
-### `parse_config()` changes
+### Changes to `calendar_reader.get_personal_events()`
 
-`drive_config.parse_config()` already preserves `location` and `meeting_type` keys via passthrough (the recurring meeting dict is normalised with `m.get("location")` etc.). Verify that `parse_config` passes through unknown keys on meeting entries without dropping them.
+Add `location` field to the returned dict:
+```python
+{"title": str, "start": datetime, "end": datetime | None, "location": str | None}
+```
+Read from `event.get("location", "")`.
+
+### NPC-0007 classification extension (MSI unknown blocks)
+
+When classifying an unknown MSI block (NPC-0007 flow in `sync_job._classify_unknown_blocks()`), after the user selects a meeting type, ask: **"Where is this meeting?"** with a `choose from list` of existing location names + "Somewhere else (enter name)" + "Home (no travel)". The selected/entered location is stored on the new recurring meeting entry written back to Drive config.
+
+### `parse_config()` additions
+
+- `"Home": 0` is injected into `config["locations"]` as a default if not already present.
+- `location` and `meeting_type` fields are passed through on recurring meeting entries.
 
 ### Preferences Locations editor
 
@@ -89,23 +117,28 @@ None — all ACs automatable.
 
 **Acceptance Criteria:**
 
-- AC1.1: `compute.py` exports `resolve_prep_minutes(meeting: dict, config: dict) -> int` — a pure function implementing the resolution algorithm above.
-- AC1.2: When `meeting["location"]` is set and found in `config["locations"]`, `resolve_prep_minutes` returns `travel_minutes + fixed_minutes`.
-- AC1.3: When `meeting["location"]` is set but NOT in `config["locations"]`, returns `config["default_prep_minutes"]`.
-- AC1.4: When `meeting` has no `location`, returns `meeting.get("prep_minutes", config["default_prep_minutes"])` — existing behavior unchanged.
-- AC1.5: `meeting_type_prep` values of `"travel+N"` contribute `N` as `fixed_minutes` (travel part already counted in travel_minutes). Integer values contribute directly.
-- AC1.6: `compute_alarm()` calls `resolve_prep_minutes(matched, config)` instead of using `matched["prep_minutes"]` directly when processing MSI blocks.
-- AC1.7: `parse_config()` in `drive_config.py` passes through `location` and `meeting_type` keys on recurring meeting entries (they are already included via `m.get(..., "")` — verify and fix if not).
-- AC1.8: No `datetime.utcnow()`.
+- AC1.1: `compute.py` exports `resolve_prep_minutes(meeting: dict, config: dict, event_location: str | None = None) -> int` — pure function implementing the resolution algorithm.
+- AC1.2: When `event_location` is provided (non-empty string), it is used as the location name; empty string falls back to `"Home"`.
+- AC1.3: When `event_location` is None and `meeting["location"]` is set and found in `config["locations"]`, returns `travel_minutes + fixed_minutes`.
+- AC1.4: When location is not found in `config["locations"]`, falls back to `config["locations"].get("Home", 0) + fixed_minutes`.
+- AC1.5: When no location at all, returns `meeting.get("prep_minutes", config["default_prep_minutes"])` — existing behavior unchanged.
+- AC1.6: `"travel+N"` values contribute `N` as `fixed_minutes`; integer values contribute directly.
+- AC1.7: `compute_alarm()` calls `resolve_prep_minutes(matched, config)` for MSI blocks and `resolve_prep_minutes(event_dict, config, event_location=event["location"])` for personal events.
+- AC1.8: `calendar_reader.get_personal_events()` returns `location: str | None` field from the Google Calendar event.
+- AC1.9: `parse_config()` injects `"Home": 0` into `config["locations"]` if not already present; passes through `location` and `meeting_type` on meeting entries.
+- AC1.10: No `datetime.utcnow()`.
 
 **Test coverage (`tests/test_travel_time.py`):**
 - `test_resolve_prep_no_location_returns_prep_minutes` — meeting with no location; assert returns `prep_minutes`.
 - `test_resolve_prep_known_location_integer_type` — location found, `meeting_type` maps to int; assert `travel + fixed`.
 - `test_resolve_prep_known_location_travel_plus_type` — location found, `meeting_type` maps to `"travel+10"`; assert `travel + 10`.
-- `test_resolve_prep_unknown_location_returns_default` — location not in locations dict; assert default.
-- `test_resolve_prep_no_meeting_type_uses_prep_minutes` — location found, no meeting_type; assert `travel + prep_minutes`.
-- `test_compute_alarm_uses_resolved_prep` — matched meeting with location; assert alarm uses resolved prep, not raw prep_minutes.
-- `test_parse_config_preserves_location_field` — YAML with location on meeting; assert `location` key present in parsed meeting dict.
+- `test_resolve_prep_unknown_location_falls_back_to_home` — location not in locations dict; assert uses Home (0) + fixed.
+- `test_resolve_prep_event_location_empty_string_uses_home` — `event_location=""`; assert Home fallback.
+- `test_resolve_prep_event_location_override` — `event_location="Office"`; assert travel from Office.
+- `test_compute_alarm_personal_event_uses_location` — personal event with location field; assert resolved prep used.
+- `test_calendar_reader_returns_location_field` — mock API event with location; assert `location` in returned dict.
+- `test_parse_config_injects_home_location` — YAML with no Home in locations; assert `"Home": 0` injected.
+- `test_parse_config_preserves_location_field` — YAML with location on meeting; assert `location` key present.
 
 **Dependencies:** None.
 
@@ -183,9 +216,11 @@ US-1 and US-2 touch different files (`compute.py`/`drive_config.py` vs `preferen
 
 ### Modify
 - `compute.py` — add `resolve_prep_minutes()`, update `compute_alarm()`
-- `drive_config.py` — ensure `parse_config()` passes `location`, `meeting_type` through
+- `calendar_reader.py` — add `location` field to `get_personal_events()` return dict
+- `drive_config.py` — inject `Home: 0`, pass through `location`/`meeting_type` on meetings
+- `sync_job.py` — extend `_classify_unknown_blocks()` to ask for location after meeting type
 - `preferences.py` — add locations editor after core fields
-- `config.yaml` — add example location
+- `config.yaml` — add Home location and example location
 
 ### Create
 - `tests/test_travel_time.py`
