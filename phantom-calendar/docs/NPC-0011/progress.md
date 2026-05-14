@@ -10,3 +10,4 @@ status: SpecDraft
 ## Stories
 - US-1: resolve_prep_minutes + parse_config fix — NotStarted
 - US-2: Locations editor in Preferences — NotStarted
+- US-3: Date override / test mode — NotStarted

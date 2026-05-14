@@ -168,6 +168,28 @@ None — all ACs automatable.
 
 ---
 
+### US-3 — Date Override (Test Mode)
+
+**Story:** As a developer, I want to run the full sync pipeline against a specific date instead of "tomorrow" so I can test travel time and alarm computation against real past or future calendar events without waiting for the next nightly trigger.
+
+**Acceptance Criteria:**
+
+- AC3.1: `calendar_reader.get_tomorrow_range()`, `get_msi_time_blocks()`, and `get_personal_events()` accept an optional `target_date: date | None = None` parameter. When `None`, behavior is unchanged (tomorrow). When provided, uses that date.
+- AC3.2: `sync_job.run_nightly_sync(app_ref=None, target_date=None)` accepts the same optional parameter and passes it through to all calendar reader calls.
+- AC3.3: `app.py` gains a **"Run for date…"** menu item (below "Run now") that shows an osascript dialog asking for a date in `YYYY-MM-DD` format, then calls `run_nightly_sync(app_ref=self, target_date=parsed_date)` in a daemon thread.
+- AC3.4: Invalid date input (wrong format, non-existent date) shows an error dialog and does not start a sync.
+- AC3.5: The date override does NOT affect the scheduler trigger — it only applies to the single manually-triggered run.
+- AC3.6: `queue_run()` in `sync_job.py` accepts `target_date=None` and passes it through to `run_nightly_sync()`.
+
+**Test coverage (`tests/test_travel_time.py` — `TestDateOverride`):**
+- `test_get_tomorrow_range_uses_target_date` — pass a specific date; assert range uses that date, not tomorrow.
+- `test_run_nightly_sync_passes_target_date_to_calendar_reader` — mock calendar reader; assert called with target_date.
+- `test_invalid_date_format_shows_error` — mock `_osascript`; assert error dialog shown, sync not started.
+
+**Dependencies:** US-1 (calendar_reader changes already included).
+
+---
+
 ## Feature-Wide Acceptance Criteria
 
 - **FAC-1**: `uv run python -m pytest tests/ -v` exits 0.
@@ -192,16 +214,20 @@ None — all ACs automatable.
 - Google Maps API for live travel time.
 - Auto-detecting meeting location from calendar event details.
 - Travel time for personal calendar events or unknown MSI blocks.
+- Persisting the test date across restarts (single-run only).
 
 ---
 
 ## Definition of Done
 
 - [ ] `compute.py`: `resolve_prep_minutes()` exported; `compute_alarm()` uses it.
+- [ ] `calendar_reader.py`: `target_date` parameter on range/block/event functions.
 - [ ] `drive_config.py`: `parse_config()` passes through `location` and `meeting_type` on meeting entries.
+- [ ] `sync_job.py`: `run_nightly_sync(app_ref, target_date)` passes date to calendar reader; `_classify_unknown_blocks()` asks for location.
+- [ ] `app.py`: "Run for date…" menu item.
 - [ ] `preferences.py`: locations editor added after core fields save.
 - [ ] `config.yaml`: example location entry added.
-- [ ] `tests/test_travel_time.py`: ≥ 11 cases, all passing.
+- [ ] `tests/test_travel_time.py`: ≥ 14 cases, all passing.
 - [ ] `uv run python -m pytest tests/ -v` exits 0.
 
 ---
@@ -216,9 +242,10 @@ US-1 and US-2 touch different files (`compute.py`/`drive_config.py` vs `preferen
 
 ### Modify
 - `compute.py` — add `resolve_prep_minutes()`, update `compute_alarm()`
-- `calendar_reader.py` — add `location` field to `get_personal_events()` return dict
+- `calendar_reader.py` — add `location` field to `get_personal_events()`; add `target_date` param to range/block/event functions
 - `drive_config.py` — inject `Home: 0`, pass through `location`/`meeting_type` on meetings
-- `sync_job.py` — extend `_classify_unknown_blocks()` to ask for location after meeting type
+- `sync_job.py` — `run_nightly_sync(app_ref, target_date)`, extend `_classify_unknown_blocks()` for location; `queue_run(target_date)`
+- `app.py` — add "Run for date…" menu item
 - `preferences.py` — add locations editor after core fields
 - `config.yaml` — add Home location and example location
 

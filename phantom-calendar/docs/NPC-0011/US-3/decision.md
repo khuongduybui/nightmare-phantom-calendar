@@ -1,0 +1,1 @@
+- 2026-05-14 — Decision: Initial state files created for US-3 (Date Override / Test Mode). Impact: calendar_reader.py (target_date param), sync_job.py (run_nightly_sync target_date), app.py (Run for date… menu item), tests/test_travel_time.py (TestDateOverride).
