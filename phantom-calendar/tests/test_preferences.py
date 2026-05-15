@@ -23,8 +23,9 @@ class TestPreferencesWindow(unittest.TestCase):
     def test_cancel_returns_none(self, _):
         self.assertIsNone(preferences.PreferencesWindow(BASE_CONFIG).show())
 
+    @patch("preferences._edit_locations", return_value={"Home": 0})
     @patch("preferences._ask")
-    def test_save_returns_updated(self, mock_ask):
+    def test_save_returns_updated(self, mock_ask, _mock_locs):
         mock_ask.side_effect = UPDATED
         r = preferences.PreferencesWindow(BASE_CONFIG).show()
         self.assertEqual(r["daily_run_time"], "20:00")

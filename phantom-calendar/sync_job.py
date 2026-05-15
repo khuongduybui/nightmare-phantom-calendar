@@ -244,6 +244,11 @@ def run_nightly_sync(app_ref=None, target_date=None) -> None:
         print("[sync_job] Sync already in progress — skipping.", file=sys.stderr)
         return
 
+    debug = target_date is not None
+
+    if debug:
+        print(f"[DEBUG] === Phantom Calendar — debug/triage mode for {target_date} ===")
+
     if app_ref is not None:
         try:
             app_ref.set_syncing(True)
@@ -258,11 +263,40 @@ def run_nightly_sync(app_ref=None, target_date=None) -> None:
         config = parse_config(raw)
 
         timezone_str = config.get("timezone", "America/New_York")
-        msi_blocks = get_msi_time_blocks(target_date=target_date)
-        personal_events = get_personal_events(target_date=target_date)
+        if debug:
+            print(f"[DEBUG] Timezone: {timezone_str}")
 
-        result = compute_alarm(msi_blocks, personal_events, config)
+        msi_blocks = get_msi_time_blocks(target_date=target_date)
+        if debug:
+            print(f"[DEBUG] MSI blocks fetched: {len(msi_blocks)}")
+            for b in msi_blocks:
+                print(
+                    f"[DEBUG]   {b['start'].strftime('%H:%M')} – {b['end'].strftime('%H:%M')}"
+                )
+
+        personal_events = get_personal_events(target_date=target_date)
+        if debug:
+            print(f"[DEBUG] Personal events fetched: {len(personal_events)}")
+            for e in personal_events:
+                loc = f" @ {e['location']}" if e.get("location") else ""
+                print(f"[DEBUG]   {e['start'].strftime('%H:%M')} — {e['title']}{loc}")
+
+        result = compute_alarm(msi_blocks, personal_events, config, debug=debug)
         alarm_time = result.get("alarm_time")
+
+        if debug:
+            print(f"[DEBUG] --- Alarm result ---")
+            print(f"[DEBUG] First meeting : {result.get('first_meeting_name')}")
+            mt = result.get("first_meeting_time")
+            print(f"[DEBUG] Meeting time  : {mt.strftime('%H:%M') if mt else 'N/A'}")
+            print(f"[DEBUG] Prep minutes  : {result.get('prep_minutes')}")
+            at = result.get("alarm_time")
+            print(f"[DEBUG] Alarm time    : {at.strftime('%H:%M') if at else 'N/A'}")
+            print(f"[DEBUG] Is baseline   : {result.get('is_baseline')}")
+            print(
+                f"[DEBUG] All candidates: {[c['name'] for c in result.get('all_meetings', [])]}"
+            )
+            print(f"[DEBUG] Unknown blocks: {len(result.get('unknown_blocks', []))}")
 
         popup_response = _show_popup(result, config)
 

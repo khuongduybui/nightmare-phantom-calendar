@@ -63,7 +63,7 @@ class TestRunNightlySync(unittest.TestCase):
         mock_parse.assert_called_once_with("yaml")
         mock_msi.assert_called_once()
         mock_personal.assert_called_once()
-        mock_compute.assert_called_once_with([], [], MOCK_CONFIG)
+        mock_compute.assert_called_once_with([], [], MOCK_CONFIG, debug=False)
         mock_popup.assert_called_once_with(MOCK_RESULT, MOCK_CONFIG)
         mock_write.assert_called_once_with(
             MOCK_POPUP_RESPONSE,

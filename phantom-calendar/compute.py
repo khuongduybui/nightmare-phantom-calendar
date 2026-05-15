@@ -84,6 +84,7 @@ def compute_alarm(
     msi_blocks: list,
     personal_events: list,
     config: dict,
+    debug: bool = False,
 ) -> dict:
     """Compute the alarm time for tomorrow's first meeting.
 
@@ -101,6 +102,13 @@ def compute_alarm(
     baseline_title = config.get("baseline_event_title", "")
     baseline_time_str = config.get("baseline_event_time", "")
 
+    if debug:
+        print(f"[DEBUG] --- compute_alarm ---")
+        print(
+            f"[DEBUG] default_prep={default_prep}, baseline='{baseline_title}' @ {baseline_time_str}"
+        )
+        print(f"[DEBUG] {len(recurring_meetings)} recurring meeting(s) in config")
+
     candidates = []
     unknown_blocks = []
 
@@ -109,6 +117,11 @@ def compute_alarm(
         matched = match_block_to_meeting(block, recurring_meetings)
         if matched:
             prep = resolve_prep_minutes(matched, config)
+            if debug:
+                print(
+                    f"[DEBUG] MSI {block['start'].strftime('%H:%M')} → matched '{matched['name']}' "
+                    f"(type={matched.get('meeting_type')}, prep={prep} min)"
+                )
             candidates.append({
                 "name": matched["name"],
                 "time": block["start"],
@@ -116,6 +129,11 @@ def compute_alarm(
                 "source": "msi_known",
             })
         else:
+            if debug:
+                print(
+                    f"[DEBUG] MSI {block['start'].strftime('%H:%M')} → no match — "
+                    f"treated as unknown (default prep={default_prep} min)"
+                )
             unknown_blocks.append(block)
             candidates.append({
                 "name": "Unknown MSI meeting",
@@ -127,9 +145,19 @@ def compute_alarm(
     # Process personal events — exclude alarm events
     for event in personal_events:
         if "Alarm" in event.get("title", ""):
+            if debug:
+                print(
+                    f"[DEBUG] Personal '{event['title']}' @ {event['start'].strftime('%H:%M')} → skipped (alarm event)"
+                )
             continue
         event_loc = event.get("location")  # may be None or a string
         prep = resolve_prep_minutes(event, config, event_location=event_loc)
+        if debug:
+            loc_str = f" @ {event_loc}" if event_loc else ""
+            print(
+                f"[DEBUG] Personal '{event['title']}'{loc_str} @ {event['start'].strftime('%H:%M')} "
+                f"→ prep={prep} min"
+            )
         candidates.append({
             "name": event["title"],
             "time": event["start"],
@@ -138,6 +166,8 @@ def compute_alarm(
         })
 
     if not candidates:
+        if debug:
+            print("[DEBUG] No candidates — returning empty result (baseline=True)")
         return {
             "first_meeting_name": None,
             "first_meeting_time": None,
@@ -153,10 +183,23 @@ def compute_alarm(
     first = candidates[0]
     alarm_time = first["time"] - timedelta(minutes=first["prep_minutes"])
 
+    if debug:
+        print(f"[DEBUG] {len(candidates)} candidate(s) sorted by time:")
+        for c in candidates:
+            print(
+                f"[DEBUG]   [{c['source']}] {c['time'].strftime('%H:%M')} — {c['name']} (prep={c['prep_minutes']} min)"
+            )
+        print(
+            f"[DEBUG] First meeting: '{first['name']}' @ {first['time'].strftime('%H:%M')}, alarm → {alarm_time.strftime('%H:%M')}"
+        )
+
     # Check if alarm matches the baseline
     is_baseline = _is_baseline_alarm(
         first["name"], alarm_time, baseline_title, baseline_time_str
     )
+
+    if debug:
+        print(f"[DEBUG] is_baseline={is_baseline}")
 
     return {
         "first_meeting_name": first["name"],
