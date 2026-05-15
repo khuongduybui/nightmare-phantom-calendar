@@ -61,16 +61,63 @@ def _classify_unknown_blocks(
         prep_minutes = next((p for n, p in options if n == selected), None)
         if prep_minutes is None:
             continue
-        candidate_alarm = block["start"] - timedelta(minutes=prep_minutes)
+
+        # Ask for meeting location
+        location = _ask_location(config)
+
+        # Recalculate alarm using travel time if location provided
+        from compute import resolve_prep_minutes
+        dummy_meeting = {"prep_minutes": prep_minutes, "meeting_type": selected}
+        resolved = resolve_prep_minutes(dummy_meeting, config, event_location=location or "")
+        candidate_alarm = block["start"] - timedelta(minutes=resolved)
         if alarm_time is None or candidate_alarm < alarm_time:
             alarm_time = candidate_alarm
-        classifications.append({
+
+        entry = {
             "start_time": block["start"].isoformat(),
             "meeting_type": selected,
-            "prep_minutes": prep_minutes,
-        })
+            "prep_minutes": resolved,
+        }
+        if location:
+            entry["location"] = location
+        classifications.append(entry)
 
     return classifications, alarm_time
+
+
+def _ask_location(config: dict) -> str:
+    """Ask user where the unknown meeting is via osascript. Returns location name or ''."""
+    locations = config.get("locations") or {}
+    loc_names = [name for name in locations if name != "Home"]
+    choices = loc_names + ["Home (no extra travel)", "Somewhere else…", "Skip"]
+    items_str = ", ".join(f'"{n}"' for n in choices)
+    script = (
+        f'tell application "System Events" to set sel to '
+        f"choose from list {{{items_str}}} "
+        f'with prompt "Where is this meeting?" '
+        f'default items {{"Skip"}} '
+        f'with title "Phantom Calendar"\n'
+        f"if sel is false then\n  return \"Skip\"\n"
+        f"else\n  return item 1 of sel\nend if"
+    )
+    out, _ = _osascript(script)
+    selected = out.strip()
+    if not selected or selected == "Skip":
+        return ""
+    if selected == "Home (no extra travel)":
+        return "Home"
+    if selected == "Somewhere else…":
+        name_script = (
+            'tell application "System Events" to set r to display dialog '
+            '"Enter location name:" default answer "" '
+            'buttons {"Cancel", "OK"} default button "OK" '
+            'with title "Phantom Calendar"\n'
+            'if button returned of r is "Cancel" then return ""\n'
+            'return text returned of r'
+        )
+        name_out, name_rc = _osascript(name_script)
+        return name_out.strip() if name_rc == 0 else ""
+    return selected
 
 
 def _show_popup(result: dict, config: dict | None = None) -> dict:
@@ -161,21 +208,22 @@ def _osascript(script: str) -> tuple[str, int]:
     return proc.stdout.strip(), proc.returncode
 
 
-def queue_run(app_ref=None) -> None:
+def queue_run(app_ref=None, target_date=None) -> None:
     """Request a sync run, queuing it if one is already in progress.
 
     If no sync is running, calls run_nightly_sync() directly.
     If a sync is running, sets _PENDING_RUN so the current run triggers
     a follow-up immediately after it completes (at most one pending run).
+    Note: target_date is NOT queued — it only applies to direct immediate runs.
     """
     if _SYNC_LOCK.locked():
         _PENDING_RUN.set()
         print("[sync_job] Sync in progress — queued one pending run.", file=sys.stderr)
     else:
-        run_nightly_sync(app_ref)
+        run_nightly_sync(app_ref, target_date=target_date)
 
 
-def run_nightly_sync(app_ref=None) -> None:
+def run_nightly_sync(app_ref=None, target_date=None) -> None:
     """Run the full nightly sync pipeline.
 
     Args:
@@ -210,8 +258,8 @@ def run_nightly_sync(app_ref=None) -> None:
         config = parse_config(raw)
 
         timezone_str = config.get("timezone", "America/New_York")
-        msi_blocks = get_msi_time_blocks()
-        personal_events = get_personal_events()
+        msi_blocks = get_msi_time_blocks(target_date=target_date)
+        personal_events = get_personal_events(target_date=target_date)
 
         result = compute_alarm(msi_blocks, personal_events, config)
         alarm_time = result.get("alarm_time")

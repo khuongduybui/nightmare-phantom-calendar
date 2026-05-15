@@ -14,22 +14,25 @@ MSI_CALENDAR_ID = "duy.bui@motorolasolutions.com"
 LOCAL_TZ = pytz.timezone("America/New_York")
 
 
-def get_tomorrow_range() -> tuple[str, str]:
-    """Return (start_iso, end_iso) covering all of tomorrow in LOCAL_TZ."""
-    tomorrow = date.today() + timedelta(days=1)
-    start = LOCAL_TZ.localize(datetime.combine(tomorrow, time.min))
-    end = LOCAL_TZ.localize(datetime.combine(tomorrow, time.max))
+def get_tomorrow_range(target_date: "date | None" = None) -> tuple[str, str]:
+    """Return (start_iso, end_iso) covering the target date (default: tomorrow) in LOCAL_TZ."""
+    day = target_date if target_date is not None else date.today() + timedelta(days=1)
+    start = LOCAL_TZ.localize(datetime.combine(day, time.min))
+    end = LOCAL_TZ.localize(datetime.combine(day, time.max))
     return start.isoformat(), end.isoformat()
 
 
-def get_msi_time_blocks(calendar_id: str = MSI_CALENDAR_ID) -> list[dict]:
-    """Return tomorrow's MSI time blocks as [{'start': datetime, 'end': datetime}].
+def get_msi_time_blocks(
+    calendar_id: str = MSI_CALENDAR_ID,
+    target_date: "date | None" = None,
+) -> list[dict]:
+    """Return MSI time blocks for target_date (default: tomorrow).
 
     Events with only an all-day 'date' key are silently skipped.
     Results are sorted by start ascending.
     """
     service = get_calendar_service()
-    start, end = get_tomorrow_range()
+    start, end = get_tomorrow_range(target_date)
     result = (
         service.events()
         .list(
@@ -57,14 +60,18 @@ def get_msi_time_blocks(calendar_id: str = MSI_CALENDAR_ID) -> list[dict]:
     return sorted(blocks, key=lambda x: x["start"])
 
 
-def get_personal_events(calendar_id: str = PERSONAL_CALENDAR_ID) -> list[dict]:
-    """Return tomorrow's Personal calendar events as [{'title', 'start', 'end'}].
+def get_personal_events(
+    calendar_id: str = PERSONAL_CALENDAR_ID,
+    target_date: "date | None" = None,
+) -> list[dict]:
+    """Return Personal calendar events for target_date (default: tomorrow).
 
+    Returns [{'title', 'start', 'end', 'location'}].
     Events with only an all-day 'date' key are silently skipped.
     Results are sorted by start ascending.
     """
     service = get_calendar_service()
-    start, end = get_tomorrow_range()
+    start, end = get_tomorrow_range(target_date)
     result = (
         service.events()
         .list(
@@ -88,6 +95,7 @@ def get_personal_events(calendar_id: str = PERSONAL_CALENDAR_ID) -> list[dict]:
                 "title": event.get("summary", "Untitled"),
                 "start": datetime.fromisoformat(start_str),
                 "end": datetime.fromisoformat(end_str) if end_str else None,
+                "location": event.get("location") or None,
             }
         )
 

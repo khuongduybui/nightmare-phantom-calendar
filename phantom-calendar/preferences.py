@@ -36,6 +36,87 @@ def _ask(
     return out.strip()
 
 
+def _edit_locations(locations: dict) -> dict:
+    """Interactive osascript editor for the locations dict. Returns updated dict."""
+    locs = dict(locations)
+    if "Home" not in locs:
+        locs["Home"] = 0
+
+    while True:
+        existing = [f"{name} ({mins} min)" for name, mins in sorted(locs.items())]
+        choices = existing + ["\u2795 Add new location", "\u2713 Done"]
+        items_str = ", ".join(f'"{c}"' for c in choices)
+        script = (
+            f'tell application "System Events" to set sel to '
+            f"choose from list {{{items_str}}} "
+            f'with prompt "Edit locations (travel time to each):" '
+            f'default items {{"\u2713 Done"}} '
+            f'with title "Phantom Calendar \u2014 Locations"\n'
+            f'if sel is false then return "\u2713 Done"\n'
+            f"return item 1 of sel"
+        )
+        out, _ = _osascript(script)
+        selected = out.strip()
+
+        if not selected or selected == "\u2713 Done":
+            break
+
+        if selected == "\u2795 Add new location":
+            name_out, rc = _osascript(
+                'tell application "System Events" to set r to display dialog '
+                '"New location name:" default answer "" '
+                'buttons {"Cancel", "Add"} default button "Add" '
+                'with title "Phantom Calendar \u2014 Locations"\n'
+                'if button returned of r is "Cancel" then return ""\n'
+                'return text returned of r'
+            )
+            name = name_out.strip()
+            if not name:
+                continue
+            mins_out, rc2 = _osascript(
+                f'tell application "System Events" to set r to display dialog '
+                f'"Travel minutes to {name}:" default answer "30" '
+                f'buttons {{"Cancel", "Save"}} default button "Save" '
+                f'with title "Phantom Calendar \u2014 Locations"\n'
+                f'if button returned of r is "Cancel" then return ""\n'
+                f'return text returned of r'
+            )
+            try:
+                locs[name] = int(mins_out.strip())
+            except ValueError:
+                pass
+        else:
+            # Edit or delete an existing entry
+            name = selected.split(" (")[0]
+            action_out, _ = _osascript(
+                f'tell application "System Events" to set sel to '
+                f'choose from list {{"Edit travel time", "Delete", "Cancel"}} '
+                f'with prompt "Location: {name}" '
+                f'default items {{"Cancel"}} '
+                f'with title "Phantom Calendar \u2014 Locations"\n'
+                f'if sel is false then return "Cancel"\n'
+                f'return item 1 of sel'
+            )
+            action = action_out.strip()
+            if action == "Delete" and name != "Home":
+                del locs[name]
+            elif action == "Edit travel time":
+                mins_out, _ = _osascript(
+                    f'tell application "System Events" to set r to display dialog '
+                    f'"Travel minutes to {name}:" default answer "{locs.get(name, 0)}" '
+                    f'buttons {{"Cancel", "Save"}} default button "Save" '
+                    f'with title "Phantom Calendar \u2014 Locations"\n'
+                    f'if button returned of r is "Cancel" then return ""\n'
+                    f'return text returned of r'
+                )
+                try:
+                    locs[name] = int(mins_out.strip())
+                except ValueError:
+                    pass
+
+    return locs
+
+
 class PreferencesWindow:
     """Sequential osascript dialogs for editing the 5 core config settings.
 
@@ -136,10 +217,15 @@ class PreferencesWindow:
             )
             return None
 
+# Edit locations after core fields
+        current_locations = dict(self._config.get("locations") or {"Home": 0})
+        updated_locations = _edit_locations(current_locations)
+
         return {
             "daily_run_time": values["daily_run_time"],
             "timezone": values["timezone"],
             "default_prep_minutes": prep,
             "personal_calendar_id": values["personal_calendar_id"],
             "msi_calendar_id": values["msi_calendar_id"],
+            "locations": updated_locations,
         }

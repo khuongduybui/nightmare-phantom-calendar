@@ -68,6 +68,7 @@ class PhantomCalendarApp(rumps.App):
             None,  # separator
             rumps.MenuItem("Preferences…", callback=self.show_preferences),
             rumps.MenuItem("Run now", callback=self.run_now),
+            rumps.MenuItem("Run for date…", callback=self.run_for_date),
         ]
 
         # Restore last run state from disk (non-fatal if missing/corrupt)
@@ -265,6 +266,40 @@ class PhantomCalendarApp(rumps.App):
         threading.Thread(
             target=queue_run, kwargs={"app_ref": self}, daemon=True
         ).start()
+
+    def run_for_date(self, _):
+        """Prompt for a date and run the sync pipeline against that date (test mode)."""
+        def _run():
+            import subprocess
+            from datetime import date as _date
+            script = (
+                'tell application "System Events" to set r to display dialog '
+                '"Enter date to sync for (YYYY-MM-DD):" '
+                'default answer "" '
+                'buttons {"Cancel", "Run"} default button "Run" '
+                'with title "Phantom Calendar — Run for Date"\n'
+                'if button returned of r is "Cancel" then return ""\n'
+                'return text returned of r'
+            )
+            proc = subprocess.run(["osascript", "-e", script],
+                                  capture_output=True, text=True, timeout=60)
+            date_str = proc.stdout.strip()
+            if not date_str or proc.returncode != 0:
+                return
+            try:
+                target = _date.fromisoformat(date_str)
+            except ValueError:
+                subprocess.run(
+                    ["osascript", "-e",
+                     'tell application "System Events" to display dialog '
+                     f'"Invalid date: \"{date_str}\". Use YYYY-MM-DD." '
+                     'buttons {"OK"} with title "Phantom Calendar"'],
+                    timeout=30,
+                )
+                return
+            queue_run(app_ref=self, target_date=target)
+
+        threading.Thread(target=_run, daemon=True).start()
 
     # ------------------------------------------------------------------
     # Login Item registration

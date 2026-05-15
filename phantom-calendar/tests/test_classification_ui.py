@@ -88,8 +88,9 @@ class TestClassificationUI(unittest.TestCase):
         }
         # User selects "Daily standup" (5 min prep) → alarm = 09:30 - 5 = 09:25
         mock_osc.side_effect = [
-            ("Daily standup", 0),
-            ("Write to Calendar||09:25", 0),
+            ("Daily standup", 0),  # type selection
+            ("Skip", 0),            # location selection (skip)
+            ("Write to Calendar||09:25", 0),  # main dialog
         ]
         response = sync_job._show_popup(result_with_unknowns, BASE_CONFIG)
         # alarm_time in response should be 09:25 (block start 09:30 - 5 min)
@@ -114,8 +115,9 @@ class TestClassificationUI(unittest.TestCase):
         unknown = [{"start": block_start, "end": _dt(11, 30)}]
         result_with_unknowns = {**NORMAL_RESULT, "unknown_blocks": unknown}
         mock_osc.side_effect = [
-            ("Interview", 0),
-            ("Write to Calendar||09:25", 0),
+            ("Interview", 0),       # type selection
+            ("Skip", 0),            # location selection (skip)
+            ("Write to Calendar||09:25", 0),  # main dialog
         ]
         response = sync_job._show_popup(result_with_unknowns, BASE_CONFIG)
         self.assertEqual(len(response["classifications"]), 1)

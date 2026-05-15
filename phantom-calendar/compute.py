@@ -3,6 +3,57 @@
 from datetime import datetime, timedelta
 
 
+def _parse_fixed_minutes(val) -> int:
+    """Parse a prep value: int → itself, 'travel+N' → N, else 0."""
+    if isinstance(val, int):
+        return val
+    if isinstance(val, str) and val.startswith("travel+"):
+        try:
+            return int(val.split("+", 1)[1])
+        except (ValueError, IndexError):
+            pass
+    return 0
+
+
+def resolve_prep_minutes(
+    meeting: dict,
+    config: dict,
+    event_location: "str | None" = None,
+) -> int:
+    """Resolve prep minutes for a meeting, applying travel time if applicable.
+
+    Args:
+        meeting: A meeting/event dict (recurring meeting entry or personal event).
+        config: Parsed config dict with 'locations', 'meeting_type_prep', etc.
+        event_location: Location string from the calendar API (personal events only).
+            Empty string → "Home". None → use meeting["location"] field.
+
+    Returns:
+        Total prep minutes (travel + fixed overhead).
+    """
+    locations = config.get("locations") or {}
+
+    # Determine location name
+    if event_location is not None:
+        location_name = event_location.strip() or "Home"
+    else:
+        location_name = meeting.get("location") or None
+
+    if location_name:
+        travel_minutes = locations.get(location_name, locations.get("Home", 0))
+        meeting_type = meeting.get("meeting_type")
+        if meeting_type:
+            type_val = config.get("meeting_type_prep", {}).get(
+                meeting_type, meeting.get("prep_minutes", 0)
+            )
+        else:
+            type_val = meeting.get("prep_minutes", 0)
+        fixed = _parse_fixed_minutes(type_val)
+        return int(travel_minutes) + fixed
+    else:
+        return meeting.get("prep_minutes", config.get("default_prep_minutes", 30))
+
+
 def match_block_to_meeting(block: dict, recurring_meetings: list) -> dict | None:
     """Match an MSI time block to a known recurring meeting by start time.
 
@@ -57,10 +108,11 @@ def compute_alarm(
     for block in msi_blocks:
         matched = match_block_to_meeting(block, recurring_meetings)
         if matched:
+            prep = resolve_prep_minutes(matched, config)
             candidates.append({
                 "name": matched["name"],
                 "time": block["start"],
-                "prep_minutes": matched["prep_minutes"],
+                "prep_minutes": prep,
                 "source": "msi_known",
             })
         else:
@@ -76,10 +128,12 @@ def compute_alarm(
     for event in personal_events:
         if "Alarm" in event.get("title", ""):
             continue
+        event_loc = event.get("location")  # may be None or a string
+        prep = resolve_prep_minutes(event, config, event_location=event_loc)
         candidates.append({
             "name": event["title"],
             "time": event["start"],
-            "prep_minutes": 10,
+            "prep_minutes": prep,
             "source": "personal",
         })
 

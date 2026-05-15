@@ -16,7 +16,7 @@ class TestQueueRun(unittest.TestCase):
     @patch("sync_job.run_nightly_sync")
     def test_queue_run_calls_sync_directly_when_not_running(self, mock_sync):
         sync_job.queue_run()
-        mock_sync.assert_called_once_with(None)
+        mock_sync.assert_called_once_with(None, target_date=None)
 
     def test_queue_run_sets_pending_when_running(self):
         sync_job._SYNC_LOCK.acquire()
@@ -40,7 +40,7 @@ class TestQueueRun(unittest.TestCase):
         app_ref = MagicMock()
         with patch("sync_job.run_nightly_sync") as mock_sync:
             sync_job.queue_run(app_ref=app_ref)
-        mock_sync.assert_called_once_with(app_ref)
+        mock_sync.assert_called_once_with(app_ref, target_date=None)
 
 
 class TestPendingRunExecution(unittest.TestCase):
@@ -87,9 +87,9 @@ class TestPendingRunExecution(unittest.TestCase):
         call_count = {"n": 0}
         original_sync = sync_job.run_nightly_sync
 
-        def counting_sync(app_ref=None):
+        def counting_sync(app_ref=None, target_date=None):
             call_count["n"] += 1
-            original_sync(app_ref)
+            original_sync(app_ref, target_date=target_date)
 
         with patch.object(sync_job, "run_nightly_sync", side_effect=counting_sync):
             sync_job.queue_run()

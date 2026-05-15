@@ -36,6 +36,8 @@ meeting_type_prep:
   In-person (far): travel+15
   Unknown: 30
 
-locations: {}
+locations:
+  Home: 0          # default fallback — no travel
+  # Office: 25     # example: 25 min to office
 
 client_overrides: {}

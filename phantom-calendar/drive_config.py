@@ -165,8 +165,11 @@ def append_recurring_meetings(classifications: list, config: dict) -> None:
             "end": end_str,
             "days": ["Mon", "Tue", "Wed", "Thu", "Fri"],
             "prep_minutes": prep,
+            "meeting_type": meeting_type,
             "notes": "Auto-classified by Phantom Calendar",
         }
+        if c.get("location"):
+            new_entry["location"] = c["location"]
         existing_meetings.append(new_entry)
 
     # Build updated config dict and serialize back to YAML
@@ -207,8 +210,7 @@ def parse_config(raw: str) -> dict:
     for m in raw_meetings:
         if not isinstance(m, dict):
             continue
-        meetings.append(
-            {
+        entry = {
                 "name": m.get("name", ""),
                 "start": m.get("start", ""),
                 "end": m.get("end", ""),
@@ -218,7 +220,12 @@ def parse_config(raw: str) -> dict:
                 ),
                 "notes": m.get("notes", ""),
             }
-        )
+        # Pass through optional location/meeting_type fields
+        if m.get("location"):
+            entry["location"] = m["location"]
+        if m.get("meeting_type"):
+            entry["meeting_type"] = m["meeting_type"]
+        meetings.append(entry)
 
     return {
         "personal_calendar_id": calendars.get(
@@ -237,6 +244,14 @@ def parse_config(raw: str) -> dict:
         "baseline_event_time": baseline.get("time", _DEFAULTS["baseline_event_time"]),
         "recurring_meetings": meetings,
         "meeting_type_prep": data.get("meeting_type_prep") or {},
-        "locations": data.get("locations") or {},
+        "locations": _ensure_home_location(data.get("locations") or {}),
         "client_overrides": data.get("client_overrides") or {},
     }
+
+
+def _ensure_home_location(locations: dict) -> dict:
+    """Inject 'Home': 0 into the locations dict if not already present."""
+    if "Home" not in locations:
+        locations = dict(locations)
+        locations["Home"] = 0
+    return locations

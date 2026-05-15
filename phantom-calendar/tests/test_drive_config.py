@@ -123,7 +123,7 @@ class TestParseConfig(unittest.TestCase):
         self.assertEqual(result["baseline_event_time"], "09:25")
         self.assertEqual(result["recurring_meetings"], [])
         self.assertEqual(result["meeting_type_prep"], {})
-        self.assertEqual(result["locations"], {})
+        self.assertEqual(result["locations"], {"Home": 0})  # Home:0 always injected
         self.assertEqual(result["client_overrides"], {})
 
     def test_parse_config_overrides_calendar_ids(self):
