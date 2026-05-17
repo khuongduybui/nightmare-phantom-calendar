@@ -10,7 +10,7 @@ import rumps
 from calendar_reader import get_msi_time_blocks, get_personal_events
 from calendar_writer import run_calendar_write
 from compute import compute_alarm
-from drive_config import append_recurring_meetings, parse_config, read_config
+from drive_config import append_locations, append_recurring_meetings, parse_config, read_config
 
 _SYNC_LOCK = threading.Lock()
 _PENDING_RUN = threading.Event()
@@ -120,6 +120,75 @@ def _ask_location(config: dict) -> str:
     return selected
 
 
+def _prompt_unknown_locations(
+    unknown_locs: list, config: dict, current_alarm: "datetime | None"
+) -> "tuple[dict, datetime | None]":
+    """Show one osascript dialog per unique location in unknown_locs.
+
+    Groups events that share the same location string. Prompts for an integer
+    travel-minutes value (default "0"). Recalculates alarm_time when the
+    entered value is non-zero and the event is earlier than the current alarm.
+
+    Returns:
+        (location_travel_minutes, updated_alarm_time) where location_travel_minutes
+        contains only entries with non-zero integer values.
+    """
+    from datetime import timedelta
+
+    # Group by location string
+    groups: dict[str, list] = {}
+    for entry in unknown_locs:
+        loc = entry["location"]
+        groups.setdefault(loc, []).append(entry)
+
+    location_travel_minutes: dict = {}
+    alarm_time = current_alarm
+
+    for location, entries in groups.items():
+        titles = ", ".join(f'"{e["title"]}"' for e in entries)
+        prompt_text = (
+            f"Location: {location}\\n"
+            f"Event(s): {titles}\\n\\n"
+            f"How many minutes of travel time?"
+        )
+        script = (
+            f'tell application "System Events" to set r to display dialog '
+            f'"{prompt_text}" '
+            f'default answer "0" '
+            f'buttons {{"Skip", "OK"}} default button "OK" '
+            f'with title "Phantom Calendar"\n'
+            f'if button returned of r is "Skip" then return ""\n'
+            f'return text returned of r'
+        )
+        out, rc = _osascript(script)
+        raw_val = out.strip()
+
+        # Cancellation (rc != 0) or blank/non-integer → treat as 0, skip entry
+        if rc != 0 or not raw_val:
+            continue
+        try:
+            travel_minutes = int(raw_val)
+        except ValueError:
+            continue
+        if travel_minutes <= 0:
+            continue
+
+        location_travel_minutes[location] = travel_minutes
+
+        # Recalculate alarm: check each event in this location group
+        for entry in entries:
+            try:
+                from datetime import datetime as _dt
+                event_start = _dt.fromisoformat(entry["start_time"])
+            except (ValueError, KeyError):
+                continue
+            candidate_alarm = event_start - timedelta(minutes=travel_minutes)
+            if alarm_time is None or candidate_alarm < alarm_time:
+                alarm_time = candidate_alarm
+
+    return location_travel_minutes, alarm_time
+
+
 def _show_popup(result: dict, config: dict | None = None) -> dict:
     """Show the alarm confirmation dialog using osascript (works from any thread)."""
     meeting_name = result.get("first_meeting_name")
@@ -131,16 +200,24 @@ def _show_popup(result: dict, config: dict | None = None) -> dict:
             '"No meetings found for tomorrow." buttons {"OK"} '
             'default button "OK" with title "Phantom Calendar"'
         )
-        return {"confirmed": False, "alarm_time": None, "skipped": True, "classifications": []}
+        return {"confirmed": False, "alarm_time": None, "skipped": True, "classifications": [], "location_travel_minutes": {}}
 
     alarm_time = result.get("alarm_time")
     prep = result.get("prep_minutes", 0)
     classifications: list = []
+    location_travel_minutes: dict = {}
 
     # Classification dialogs for unknown blocks (normal mode only, not baseline)
     unknown = result.get("unknown_blocks") or []
     if unknown and config and not result.get("is_baseline"):
         classifications, alarm_time = _classify_unknown_blocks(unknown, config, alarm_time)
+
+    # Prompt for unknown personal event locations (normal mode only, not baseline)
+    unknown_locs = result.get("unknown_personal_locations") or []
+    if unknown_locs and config and not result.get("is_baseline"):
+        location_travel_minutes, alarm_time = _prompt_unknown_locations(
+            unknown_locs, config, alarm_time
+        )
 
     alarm_str = alarm_time.strftime("%H:%M") if alarm_time else "—"
 
@@ -165,7 +242,7 @@ def _show_popup(result: dict, config: dict | None = None) -> dict:
             f'✓ Matches baseline — no new event needed." '
             f'buttons {{"OK"}} default button "OK" with title "Phantom Calendar"'
         )
-        return {"confirmed": False, "alarm_time": None, "skipped": False, "classifications": classifications}
+        return {"confirmed": False, "alarm_time": None, "skipped": False, "classifications": classifications, "location_travel_minutes": location_travel_minutes}
 
     # Normal mode — ask to confirm/edit alarm time
     script = (
@@ -185,7 +262,7 @@ def _show_popup(result: dict, config: dict | None = None) -> dict:
     out, rc = _osascript(script)
 
     if rc != 0 or "Write to Calendar" not in out:
-        return {"confirmed": False, "alarm_time": None, "skipped": True, "classifications": classifications}
+        return {"confirmed": False, "alarm_time": None, "skipped": True, "classifications": classifications, "location_travel_minutes": location_travel_minutes}
 
     time_str = out.split("||")[-1].strip() if "||" in out else alarm_str
     try:
@@ -194,7 +271,7 @@ def _show_popup(result: dict, config: dict | None = None) -> dict:
     except (ValueError, AttributeError):
         confirmed_alarm = alarm_time
 
-    return {"confirmed": True, "alarm_time": confirmed_alarm, "skipped": False, "classifications": classifications}
+    return {"confirmed": True, "alarm_time": confirmed_alarm, "skipped": False, "classifications": classifications, "location_travel_minutes": location_travel_minutes}
 
 
 def _osascript(script: str) -> tuple[str, int]:
@@ -317,6 +394,17 @@ def run_nightly_sync(app_ref=None, target_date=None) -> None:
                 )
             except Exception as exc:
                 print(f"[sync_job] WARNING: Could not write classifications to Drive — {exc}", file=sys.stderr)
+
+        # Write new location → travel-minutes mappings to Drive config (non-fatal)
+        if popup_response.get("location_travel_minutes"):
+            try:
+                append_locations(popup_response["location_travel_minutes"], config)
+                print(
+                    f"[sync_job] Wrote {len(popup_response['location_travel_minutes'])} "
+                    "location(s) to Drive config."
+                )
+            except Exception as exc:
+                print(f"[sync_job] WARNING: Could not write locations to Drive — {exc}", file=sys.stderr)
 
     except Exception as exc:
         failed = True

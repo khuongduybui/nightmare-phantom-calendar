@@ -194,6 +194,37 @@ def append_recurring_meetings(classifications: list, config: dict) -> None:
     write_config(yaml.dump(updated_data, default_flow_style=False, allow_unicode=True))
 
 
+def append_locations(location_travel_minutes: dict, config: dict) -> None:
+    """Merge new location → travel-minutes mappings into the Drive config.
+
+    Existing locations are not overwritten. New entries are merged on top of
+    existing ones, then the full config is written back to Drive.
+    """
+    existing_locations = config.get("locations") or {}
+    # Existing entries take precedence — new entries only added where not present
+    updated_locations = {**location_travel_minutes, **existing_locations}
+
+    updated_data = {
+        "calendars": {
+            "personal_id": config["personal_calendar_id"],
+            "msi_id": config["msi_calendar_id"],
+            "daily_run_time": config.get("daily_run_time", "21:00"),
+        },
+        "timezone": config.get("timezone", "America/New_York"),
+        "default_prep_minutes": config.get("default_prep_minutes", 30),
+        "baseline_event": {
+            "id": config.get("baseline_event_id", ""),
+            "title": config.get("baseline_event_title", ""),
+            "time": config.get("baseline_event_time", "09:25"),
+        },
+        "recurring_meetings": list(config.get("recurring_meetings") or []),
+        "meeting_type_prep": config.get("meeting_type_prep") or {},
+        "locations": updated_locations,
+        "client_overrides": config.get("client_overrides") or {},
+    }
+    write_config(yaml.dump(updated_data, default_flow_style=False, allow_unicode=True))
+
+
 def parse_config(raw: str) -> dict:
     """Parse YAML config string into a structured dict with sane defaults."""
     try:

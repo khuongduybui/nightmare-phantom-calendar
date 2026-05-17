@@ -1,0 +1,1 @@
+- 2026-05-16T00:00:00 — Decision: State files initialized for US-2. Rationale: Spec approved (hash 75972f8a557d). Impact: sync_job.py (add _prompt_unknown_locations(), update _show_popup(), update run_nightly_sync()), drive_config.py (add append_locations()), tests/test_sync_job.py (new unit tests for AC 2.4–2.11).
