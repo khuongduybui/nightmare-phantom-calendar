@@ -10,6 +10,7 @@ PACKAGES = [
     ("apscheduler", "apscheduler"),
     ("pytz", "pytz"),
     ("pyyaml", "yaml"),
+    ("openai", "openai"),
 ]
 
 failed = False
