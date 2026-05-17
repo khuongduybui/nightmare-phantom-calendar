@@ -10,7 +10,7 @@ import rumps
 import osaurus_client
 from calendar_reader import get_msi_time_blocks, get_personal_events
 from calendar_writer import run_calendar_write
-from compute import compute_alarm
+from compute import compute_alarm, match_block_to_meeting
 from drive_config import append_locations, append_recurring_meetings, parse_config, read_config
 
 _SYNC_LOCK = threading.Lock()
@@ -247,11 +247,17 @@ def _classify_personal_events(
     classifications = []
     alarm_time = current_alarm
 
+    recurring_meetings = config.get("recurring_meetings") or []
+
     for event in personal_events:
         title = event.get("title", "Untitled")
         description = event.get("description", "")
         start = event.get("start")
         if start is None:
+            continue
+
+        # Skip events already matched to a recurring_meetings entry
+        if match_block_to_meeting({"start": start}, recurring_meetings):
             continue
 
         # Get AI suggestion

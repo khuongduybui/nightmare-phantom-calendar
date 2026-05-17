@@ -342,6 +342,37 @@ class TestClassifyPersonalEvents(unittest.TestCase):
         classify_calls = [c for c in mock_osc.call_args_list if "choose from list" in str(c)]
         self.assertEqual(len(classify_calls), 0)
 
+    @patch("sync_job.osaurus_client.suggest_meeting_type", return_value=None)
+    @patch("sync_job._osascript", return_value=("Write to Calendar||09:25", 0))
+    def test_already_matched_personal_event_not_prompted(self, mock_osc, _mock_suggest):
+        """Bug fix: personal events already in recurring_meetings must not trigger
+        a classification dialog — otherwise the same meeting is asked about every run.
+        """
+        event = {
+            "title": "Weekly 1:1",
+            "description": "",
+            "start": _dt(14, 0),
+            "end": _dt(14, 30),
+        }
+        config_with_match = {
+            **BASE_CONFIG,
+            "recurring_meetings": [
+                {
+                    "name": "Weekly 1:1",
+                    "start": "14:00",
+                    "end": "14:30",
+                    "days": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+                    "prep_minutes": 10,
+                }
+            ],
+        }
+        result = {**NORMAL_RESULT, "personal_events": [event], "unknown_blocks": []}
+        sync_job._show_popup(result, config_with_match)
+        classify_calls = [
+            c for c in mock_osc.call_args_list if "choose from list" in str(c)
+        ]
+        self.assertEqual(len(classify_calls), 0)
+
 
 import sync_job  # noqa: E402
 
