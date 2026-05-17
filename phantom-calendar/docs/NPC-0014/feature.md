@@ -1,35 +1,22 @@
 # Summary
 
-Phantom Calendar adds Apple Calendar as a first-class backend for reading tomorrow's calendar events and writing prep alarm events on macOS. When Apple Calendar is accessible and the required calendar names are configured, it replaces the Google Calendar API for both reads and writes. If Apple Calendar is unavailable at the start of a sync run — icalbuddy not installed, Calendar permissions not granted, or a configured calendar name missing — the system falls back to Google Calendar automatically and completes the run using the existing backend. Google Calendar config remains valid and serves as the fallback.
+Phantom Calendar adds Apple Calendar as a read-only event source on macOS, replacing Google Calendar for event querying when available. When ical-guy is installed and macOS Calendar permission is granted, tomorrow's events are read from all Apple Calendars and treated as a single unified pool — with no distinction between work and personal calendars. Prep alarm events continue to be written to Google Calendar regardless of which source is used for reading. If ical-guy is unavailable or Calendar permission is not granted, the system falls back to reading events from Google Calendar for that run.
 
 # Workflow
 
 ```mermaid
 flowchart TD
-    A[Sync starts] --> B{Apple Calendar\naccessible?}
-    B -- No --> FB[Fallback: use Google\nCalendar full pipeline]
-    B -- Yes --> C[Validate configured\ncalendar names exist]
-    C -- Any missing --> FB
-    C -- All valid --> D[Read work blocks from\nApple work calendar]
-    D --> E{Read succeeded?}
-    E -- No --> FB
-    E -- Yes --> F[Read personal events from\nApple personal calendar]
-    F --> G{Read succeeded?}
-    G -- No --> FB
-    G -- Yes --> H[Compute alarms]
-    H --> I[Delete existing Apple\nCalendar alarms for tomorrow]
-    I --> J{Delete succeeded?}
-    J -- No --> FB
-    J -- Yes --> K[Write new alarms to\nApple alarm calendar]
-    K --> L{Write succeeded?}
-    L -- No --> FB
-    L -- Yes --> M[Sync complete\nApple Calendar backend]
-    FB --> GR1[Read work blocks from\nGoogle Calendar]
-    GR1 --> GR2[Read personal events from\nGoogle Calendar]
-    GR2 --> GH[Compute alarms]
-    GH --> GN[Delete existing Google\nCalendar alarms for tomorrow]
-    GN --> GO[Write new alarms to\nGoogle Calendar]
-    GO --> P[Sync complete\nGoogle Calendar backend]
+    A[Sync starts] --> B{ical-guy in PATH\n& Calendar permission\ngranted?}
+    B -- No --> GR[Read events from\nGoogle Calendar]
+    B -- Yes --> AC[Read all events from\nall Apple Calendars]
+    AC --> E{Read succeeded?}
+    E -- No --> GR
+    E -- Yes --> U[Unified event pool]
+    GR --> U
+    U --> H[Compute alarms]
+    H --> I[Delete existing\nGoogle Calendar alarms\nfor tomorrow]
+    I --> J[Write new alarms\nto Google Calendar]
+    J --> K[Sync complete]
 ```
 
 # ZeeSpec Framework
@@ -37,50 +24,46 @@ flowchart TD
 ## WHAT — Define what exists and what doesn't.
 
 **What does the system do?**
-Reads tomorrow's work blocks and personal events from named Apple Calendars, computes prep alarms, and writes alarm events back to a named Apple Calendar — without requiring Google OAuth credentials. Falls back to Google Calendar when Apple Calendar is unavailable.
+On macOS with ical-guy installed and Calendar permission granted: reads tomorrow's events from all Apple Calendars as a single unified pool and feeds them into the existing alarm computation pipeline. Prep alarm events are always written to Google Calendar. When ical-guy is unavailable: reads events from Google Calendar as before — the alarm write path is unchanged in both cases.
 
 **What are the main things in the system?**
-- Work calendar: a named Apple Calendar that holds work time blocks
-- Personal calendar: a named Apple Calendar that holds personal events
-- Alarm calendar: a named Apple Calendar where prep alarm events are written
-- Apple Calendar backend: the primary pipeline using AppleScript/icalbuddy for reads and writes
-- Google Calendar backend: the unchanged fallback pipeline used when Apple Calendar is inaccessible
-- Backend selection: automatic at the start of each sync run; not user-facing
+- Apple Calendar reader: uses ical-guy to read all calendar events for tomorrow from all accessible Apple Calendars on macOS
+- Unified event pool: all Apple Calendar events for tomorrow, without distinction between work and personal calendars
+- Google Calendar reader: fallback read source when ical-guy is unavailable (existing behavior)
+- Google Calendar writer: always used for alarm writes, regardless of read source (unchanged)
+- Read source selection: automatic at the start of each sync run based on ical-guy availability; not user-facing
 
 **What can exist in the system?**
-- One configured Apple Calendar name for work, one for personal, one for alarms
-- Alarm events tagged as phantom-calendar-written in the alarm calendar
-- Google Calendar config (existing) that serves as fallback when Apple Calendar is unavailable
+- Events from any combination of Apple Calendars (work, personal, shared, iCloud, Exchange, etc.) in the unified pool
+- An optional configured list of Apple Calendar names to exclude from the unified pool
+- Google Calendar alarm write (always present — unchanged)
 
 **What cannot exist in the system?**
-- Apple Calendar backend on non-macOS platforms
-- Apple Calendar reads or writes without the required macOS Calendar permission
-- Alarm events written to any calendar that is not the configured alarm calendar
-- Alarm events without the phantom-calendar alarm tag in their description
+- Apple Calendar writes — ical-guy is read-only; all alarm writes go to Google Calendar
+- Apple Calendar reads on non-macOS platforms
+- Apple Calendar reads without macOS Calendar permission granted to ical-guy
+- Differentiation of events by Apple Calendar source within the compute pipeline
 
 **What information must always be present?**
-- Apple Calendar work calendar name (required to use Apple backend)
-- Apple Calendar personal calendar name (required to use Apple backend)
-- Apple Calendar alarm calendar name (required to use Apple backend)
+- Google Calendar alarm write configuration (unchanged — always required for alarm writes)
 
 **What information is optional?**
-- Google Calendar config remains optional if the user never needs the fallback (but all three Apple names must be valid for Apple backend to activate)
+- A list of Apple Calendar names to exclude from the unified event pool (defaults to empty — all calendars included)
 
 **What states can each thing be in?**
-- Backend per run: Apple (primary) | Google (fallback)
-- Apple Calendar accessibility: accessible | inaccessible (icalbuddy missing, permissions denied, or a configured calendar name not found)
-- Alarm event: present in alarm calendar | absent (before first write or after deletion)
+- Read source per run: Apple Calendar via ical-guy | Google Calendar (fallback)
+- ical-guy accessibility: accessible (installed + permission granted) | inaccessible
+- Write target: Google Calendar (always — not subject to source selection)
 
 **What changes are allowed?**
-- Creating alarm events in the Apple Calendar alarm calendar
-- Deleting previously created alarm events from the Apple Calendar alarm calendar
+- Reading events from Apple Calendar via ical-guy (read-only access)
+- Writing alarm events to Google Calendar (unchanged behavior)
 
 **What changes are not allowed?**
-- Modifying, creating, or deleting events in the work or personal Apple Calendars (read-only)
-- Writing to any Apple Calendar other than the configured alarm calendar
+- Writing any events to Apple Calendar
+- Modifying or deleting any Apple Calendar events
 
 **What should never be stored?**
-- Events outside tomorrow's date range during a sync read
 - Apple Calendar event data in any persistent state file
 
 ---
@@ -88,71 +71,63 @@ Reads tomorrow's work blocks and personal events from named Apple Calendars, com
 ## WHERE — Define boundaries and limits.
 
 **Where can the system be accessed from?**
-Apple Calendar access is macOS-only. On any other platform, Apple Calendar backend is not available and the system uses Google Calendar.
+Apple Calendar reads are macOS-only. On any other platform, the system reads from Google Calendar.
 
 **Where are actions performed?**
-- Reads: local macOS system call via icalbuddy command-line tool
-- Writes and deletes: local macOS AppleScript execution targeting Calendar.app
+- Reads (Apple path): local macOS system call via ical-guy CLI (EventKit-based, read-only)
+- Reads (Google fallback): Google Calendar API (existing behavior)
+- Writes: Google Calendar API (unchanged, always used for alarm writes regardless of read source)
 
 **Where is data allowed to go?**
-- Alarm events go only to the user's configured Apple Calendar alarm calendar
-- Read event data is used only within the sync pipeline (title, start/end, description)
+- Read event data is used only within the sync pipeline (title, start/end, description, location)
+- Alarm events continue to be written to Google Calendar only
 
 **Where is data NOT allowed to go?**
-- No event data is sent to any remote service during Apple Calendar reads or writes
-- Apple Calendar reads and writes do not affect Google Calendar (the two backends are independent)
+- No event data is sent to any remote service during Apple Calendar reads (ical-guy is local only)
+- No events are written to Apple Calendar by this system
 
 **Where are system boundaries?**
-- Apple Calendar: macOS system Calendar service (Calendar.app)
-- icalbuddy: third-party CLI tool installed on the macOS system
-- Google Calendar API: fallback only
+- Apple Calendar: local macOS Calendar.app (read via ical-guy EventKit CLI)
+- ical-guy: macOS CLI tool, local only
+- Google Calendar API: always the alarm write target; read fallback when ical-guy unavailable
 
 **Where do external systems connect?**
-- icalbuddy (local system call) for reading events
-- AppleScript → Calendar.app (local) for writing and deleting alarm events
+- ical-guy (local system call) for reading events from Apple Calendar
+- Google Calendar API for alarm writes and fallback reads (existing behavior)
 
 **Where is access restricted?**
-- macOS requires a one-time Calendar permission grant; the app cannot access Apple Calendar without it
-- Reads are restricted to the two configured calendar names only
+- macOS requires a one-time Calendar permission grant for ical-guy to access Apple Calendar
+- ical-guy provides read-only access to Calendar.app; the system writes nothing to Apple Calendar
 
 **Where can failures occur?**
-- icalbuddy not installed or not in PATH
+- ical-guy not installed or not in PATH
 - macOS Calendar permissions not granted or revoked
-- Configured Apple Calendar name does not exist in the user's Calendar
-- icalbuddy returns an unexpected format
-- AppleScript write or delete fails
+- ical-guy returns an error or unexpected output during event read
 
 **Where must the system always respond?**
-- A sync run must always complete — if any Apple Calendar step fails, the full pipeline retries via Google Calendar
+- A sync run must always complete — if Apple Calendar reads fail, Google Calendar reads are used; alarm writes always target Google Calendar
 
 ---
 
 ## WHEN — Define timing and triggers.
 
 **When is Apple Calendar used?**
-At the start of every sync run (nightly and on-demand), before Google Calendar is tried.
+For event reading at the start of every sync run (nightly and on-demand), when ical-guy is installed and Calendar permission is granted.
 
-**When does backend selection happen?**
-Once per sync run, at the beginning. The backend cannot switch mid-run.
+**When does read source selection happen?**
+Once per sync run, at the beginning. The write path (Google Calendar) is not subject to source selection — it is always Google Calendar.
 
-**When does fallback occur?**
-When any of the following is true at sync start:
-- icalbuddy is not installed
-- macOS Calendar permissions are not granted
-- Any configured Apple Calendar name does not exist in Calendar.app
-- A read or write operation against Apple Calendar returns an error
+**When does fallback occur for reads?**
+When ical-guy is not in PATH, Calendar permission is not granted, or ical-guy returns an error during the event read for tomorrow.
 
-**When are alarm events deleted?**
-At the start of the write phase of each sync run, before new alarms are written, using the same backend as the current run.
+**When are events excluded from the unified pool?**
+All-day events (no specific start and end time) are always excluded. Events from Apple Calendars named in `apple_exclude_calendars` config are excluded.
 
-**When are Google Calendar alarms cleaned up after switching to Apple backend?**
-Never automatically. If the previous run used Google Calendar and the current run uses Apple Calendar, the old Google alarms remain until a future Google-backend run (or manual deletion).
-
-**When are Apple Calendar alarms cleaned up after switching to Google backend?**
-Never automatically. If the previous run used Apple Calendar and the current run falls back to Google Calendar, the Apple Calendar alarms remain until a future Apple-backend run.
+**When are Apple Calendar alarms cleaned up?**
+Never — the system does not write alarms to Apple Calendar. All alarms are in Google Calendar and follow the existing delete-then-write behavior each run.
 
 **When must the system respond?**
-Every sync run must complete — either with Apple Calendar or with Google Calendar as fallback. No sync run ends without alarm events being written via one of the two backends.
+Every sync run must complete — using Apple Calendar or Google Calendar as the read source. Alarm writes always target Google Calendar.
 
 ---
 
@@ -162,144 +137,94 @@ Every sync run must complete — either with Apple Calendar or with Google Calen
 The local macOS user running the Phantom Calendar app.
 
 **Who grants access?**
-macOS prompts the user for Calendar permission on first access (one-time system dialog). The user must allow it.
+macOS prompts the user for Calendar permission on first ical-guy access (one-time system dialog). The user must allow it.
 
 **Who can create and delete alarm events?**
-Only the system (during a sync run). The user can also manually delete alarm events in Calendar.app.
+Only the system (during a sync run), via Google Calendar API. The user can also manually delete alarm events in Google Calendar or via Calendar.app if the Google calendar is synced there.
 
 **Who cannot access certain data?**
-The system has read-only access to the work and personal Apple Calendars. It must not modify any events in those calendars.
+ical-guy has read-only access to Calendar.app. The system must not attempt any write to Apple Calendar.
 
 **Who should never be allowed to act?**
-No remote party — all Apple Calendar operations are local system calls.
+No remote party — Apple Calendar reads are local system calls via ical-guy. Alarm writes are Google Calendar API calls, unchanged from existing behavior.
 
 ---
 
 ## WHY — Define intent and constraints.
 
 **Why does this feature exist?**
-Users who rely on Apple Calendar as their primary calendar can use Phantom Calendar without setting up Google OAuth credentials. Local calendar access is faster, requires no API keys, and is offline-capable.
+Users on macOS may have events spread across multiple calendars not all visible through Google Calendar (e.g., iCloud-only calendars, Exchange calendars, shared calendars synced via Calendar.app). Reading from Apple Calendar via ical-guy gives a complete view of tomorrow's schedule without requiring per-calendar Google configuration.
 
-**Why is Google Calendar retained as fallback?**
-Apple Calendar may be inaccessible (e.g., on a different machine, permissions revoked, icalbuddy not installed). The fallback ensures continuity without requiring user intervention.
+**Why is the write path unchanged?**
+ical-guy is read-only by design. Writing alarms to Apple Calendar would require AppleScript or direct EventKit write access, adding complexity, new permission requirements, and potential sync issues with Google Calendar (which Sleep as Android reads from). The existing Google Calendar write path is reliable and sufficient.
 
-**Why is backend selection automatic?**
-Requiring the user to manually switch backends adds friction and risk of misconfiguration. The system can detect accessibility reliably.
+**Why is the unified pool approach used?**
+Differentiating between work and personal Apple Calendars requires user configuration that may not cleanly map to reality (a user may have multiple work calendars, multiple personal calendars, or shared team calendars). Treating all events as one pool is simpler, more robust, and consistent with how ical-guy surfaces events.
 
-**Why are calendar names required in config rather than auto-detected?**
-Apple Calendar names are user-defined and vary widely. Auto-detection would risk reading from the wrong calendar.
+**Why is read source selection automatic?**
+Requiring the user to manually enable or disable Apple Calendar reads adds friction. Availability can be reliably detected at runtime.
 
-**Why is write access limited to the alarm calendar only?**
-Work and personal calendars contain real user data. The system must never mutate them.
-
-**Why are orphaned alarms from backend switches accepted?**
-Cleaning up the other backend's alarms would require access to both backends simultaneously, adding complexity and a new failure mode. Orphaned alarms are infrequent and low-impact (they expire after the target date).
-
-**Why is the backend fixed per run?**
-A mid-run switch (e.g., Apple read + Google write) would create inconsistency in alarm state — especially for deletion of previous alarms.
+**Why is Google Calendar retained as the fallback read source?**
+ical-guy may not be installed or Calendar permissions may not be granted. The fallback ensures continuity without requiring user intervention.
 
 ---
 
 ## HOW — Define behavior under all conditions.
 
-**How does the system detect Apple Calendar accessibility?**
-Checks that icalbuddy is present in PATH AND that macOS Calendar permissions are granted (by attempting a lightweight probe read).
-
-**How does the system validate configured calendar names?**
-Before reading, the system queries the list of available calendar names from Calendar.app and confirms each configured name exists.
+**How does the system detect ical-guy availability?**
+Checks that ical-guy is present in PATH using `shutil.which("ical-guy")`. If found, runs `ical-guy calendars --format json` to confirm Calendar permission is granted (non-zero exit or permission error → unavailable → fall back to Google Calendar reads silently).
 
 **How does the system read Apple Calendar events?**
-Invokes icalbuddy with the configured calendar name and tomorrow's date range. Parses output to extract title, start time, end time, and description for each timed event. All-day events (no specific start/end time) are excluded.
+Invokes `ical-guy events --from {tomorrow_iso} --to {tomorrow_iso} --exclude-all-day --format json`. If `apple_exclude_calendars` is configured, adds `--exclude-calendars "{name1},{name2}"`. Parses the JSON array — each event object contains `id`, `title`, `startDate` (ISO 8601), `endDate` (ISO 8601), `location` (nullable), `notes` (nullable). Converts to the standard event dict shape used by the compute pipeline. All events from all Apple Calendars are returned as one unified list.
 
-**How does the system write alarm events to Apple Calendar?**
-Executes an AppleScript command targeting Calendar.app to create a new event in the configured alarm calendar with the alarm start time, alarm end time (alarm start + prep minutes = event duration), title, and a description containing the alarm tag.
+**How does the system fall back to Google Calendar reads?**
+If ical-guy is unavailable (not in PATH, non-zero exit, or permission denied), the existing `get_msi_time_blocks()` and `get_personal_events()` Google Calendar functions are called. This is identical to pre-NPC-0014 behavior.
 
-**How does the system identify alarm events to delete?**
-Queries the alarm calendar for tomorrow's date range and filters events whose description contains the alarm tag.
+**How does the write path work?**
+Unchanged — `run_calendar_write()` in `calendar_writer.py` writes alarm events to Google Calendar regardless of which read source was used. No changes to the write path are made by this feature.
 
-**How does the system fall back to Google Calendar?**
-Any failure in the Apple Calendar pipeline (access check, validation, read, delete, write) triggers a full reset to the Google Calendar pipeline. For the write phase specifically: if alarm deletion from Apple Calendar has already succeeded but the subsequent write fails, the committed deletion remains (this is correct — it prevents orphaned Apple Calendar alarms when the run continues with Google Calendar). No new alarm events are written to Apple Calendar before fallback.
+**How does the system inform the user of read source fallback?**
+If ical-guy returns an error during the event read (after previously being available), the user is notified via `rumps.notification` with the specific reason. If ical-guy was never installed, fallback is silent — identical to how the system behaved before this feature.
 
-**How does the system inform the user of fallback?**
-Whenever the system falls back to Google Calendar — regardless of the cause (icalbuddy missing, permissions denied, calendar name not found, or any read/write failure) — the user is informed of the reason via the same status or notification channel used for other sync outcomes.
-
-**How does it behave when a configured calendar name does not exist?**
-Treated as inaccessible — fallback to Google Calendar for the full run. The specific missing calendar name is included in the reason surfaced to the user.
-
-**How does it stay consistent across runs?**
-Each run deletes then rewrites alarms using the same backend. Cross-backend orphaned alarms are a known, accepted edge case.
+**How does the unified event pool feed into the existing compute pipeline?**
+All Apple Calendar events for tomorrow are collected into a single list. This list is fed into `compute_alarm()` in place of the combined Google Calendar reads. The compute pipeline receives one unified event collection and applies the existing matching, classification, and prep time logic.
 
 ---
 
 # Acceptance Criteria
 
-**AC1 — Apple Calendar work calendar name in config**
-Given the system config file, when the user sets the Apple Calendar work calendar name, then the system reads tomorrow's work blocks exclusively from that named Apple Calendar.
+**AC1 — ical-guy available → Apple Calendar reads**
+Given ical-guy is installed, in PATH, and macOS Calendar permission is granted, when a sync run starts, then tomorrow's events are read from all Apple Calendars via ical-guy and treated as a unified pool.
 
-**AC2 — Apple Calendar personal calendar name in config**
-Given the system config file, when the user sets the Apple Calendar personal calendar name, then the system reads tomorrow's personal events exclusively from that named Apple Calendar.
+**AC2 — ical-guy not installed → Google Calendar reads (silent)**
+Given ical-guy is not in PATH, when a sync run starts, then the system reads events from Google Calendar without notification.
 
-**AC3 — Apple Calendar alarm calendar name in config**
-Given the system config file, when the user sets the Apple Calendar alarm calendar name, then the system writes prep alarm events exclusively to that named Apple Calendar.
+**AC3 — Calendar permissions not granted → Google Calendar reads (silent)**
+Given ical-guy is in PATH but macOS Calendar permissions have not been granted, when a sync run starts, then the system reads events from Google Calendar without notification.
 
-**AC4 — icalbuddy not installed triggers fallback**
-Given a sync run starts, when icalbuddy is not installed on the system, then the system uses Google Calendar for the full pipeline and informs the user of the specific reason (icalbuddy not found).
+**AC4 — ical-guy read failure → Google Calendar reads with notification**
+Given ical-guy is available but returns an error during the event read, when the failure is detected, then the system falls back to Google Calendar reads and notifies the user of the specific reason.
 
-**AC5 — Calendar permissions not granted triggers fallback**
-Given a sync run starts and icalbuddy is installed, when macOS Calendar permissions have not been granted to the app, then the system falls back to Google Calendar for the full pipeline and informs the user of the reason.
+**AC5 — Unified pool includes all Apple Calendars**
+Given Apple Calendar reads are active, when tomorrow's events are read, then events from all accessible Apple Calendars appear in the unified pool regardless of which calendar they belong to (work, personal, shared, iCloud, Exchange, etc.).
 
-**AC6 — Missing configured calendar name triggers fallback**
-Given a sync run starts and Apple Calendar is accessible, when any of the three configured Apple Calendar names does not exist in Calendar.app, then the system falls back to Google Calendar for the full pipeline and reports which name was not found.
+**AC6 — Excluded calendars omitted**
+Given `apple_exclude_calendars` is configured with one or more calendar names, when Apple Calendar reads run, then events from those named calendars are not included in the unified pool.
 
-**AC7 — Work block reading from Apple Calendar**
-Given Apple Calendar is accessible and the work calendar name resolves to an existing calendar, when the sync reads tomorrow's schedule, then all timed events (with explicit start and end times) from that Apple Calendar for tomorrow are retrieved.
+**AC7 — All-day events excluded**
+Given Apple Calendar reads are active, when tomorrow's events are read, then events with no specific start and end time are excluded from the unified pool.
 
-**AC8 — Personal event reading from Apple Calendar**
-Given Apple Calendar is accessible and the personal calendar name resolves to an existing calendar, when the sync reads tomorrow's schedule, then all timed events from that Apple Calendar for tomorrow are retrieved.
+**AC8 — Alarm writes always target Google Calendar**
+Given any sync run completes (whether Apple Calendar or Google Calendar reads were used), when alarms are written, then alarm events are written to Google Calendar via the existing write pipeline; no alarms are written to Apple Calendar.
 
-**AC9 — All-day events excluded**
-Given Apple Calendar is accessible, when the sync reads tomorrow's events from either the work or personal Apple Calendar, then events that have only a date (no specific start/end time) are excluded from the results.
+**AC9 — macOS-only constraint**
+Given the app is running on a non-macOS platform, when a sync run starts, then Apple Calendar reads are not attempted and the system reads from Google Calendar directly.
 
-**AC10 — Events from other calendars not included**
-Given Apple Calendar is accessible, when the sync reads tomorrow's schedule, then events from Apple Calendars not matching the configured work or personal calendar names are not included.
+**AC10 — Apple Calendar event data not persisted**
+Given a sync run completes using Apple Calendar reads, when any persistent state files are inspected, then no Apple Calendar event data (titles, start/end times, or descriptions) appears in them.
 
-**AC11 — Alarm event written to Apple Calendar**
-Given Apple Calendar is accessible and a prep alarm is computed, when the sync writes alarms, then a new event is created in the configured Apple Calendar alarm calendar at the computed alarm time with the correct title and duration.
+**AC11 — Google Calendar pipeline unchanged when Apple Calendar not used**
+Given Apple Calendar reads are not active (ical-guy unavailable or non-macOS), when a sync run completes, then behavior is identical to pre-NPC-0014 behavior.
 
-**AC12 — Alarm event tagged**
-Given an alarm event is written to Apple Calendar, when the event is inspected in Calendar.app, then the event description contains the phantom-calendar alarm tag that identifies it as system-written.
-
-**AC13 — Previous Apple Calendar alarms deleted before write**
-Given Apple Calendar is accessible and tagged alarm events from a previous run exist in the alarm Apple Calendar for tomorrow, when the sync enters the write phase, then all previously tagged alarm events for tomorrow are deleted before any new alarms are written.
-
-**AC14 — Alarm events not written to work or personal calendars**
-Given Apple Calendar is accessible, when the sync writes alarm events, then no alarm events are created in the work or personal Apple Calendars.
-
-**AC15 — Fallback uses full Google Calendar pipeline**
-Given Apple Calendar is unavailable or any Apple Calendar operation fails, when the system falls back, then the entire pipeline (read work blocks, read personal events, delete old alarms, write new alarms) runs against Google Calendar. No new alarm events are written to Apple Calendar before fallback. If alarm deletion from Apple Calendar had already succeeded before a write failure, that deletion is preserved and not reversed.
-
-**AC16 — Fallback reason surfaced to user**
-Given the system falls back to Google Calendar during a sync run, when the run completes, then the user is informed (via status or notification) of the specific reason for the fallback (e.g., icalbuddy not found, permissions denied, calendar name not found, or read/write failure) and that Google Calendar was used.
-
-**AC17 — Backend fixed per sync run**
-Given a sync run begins, when the backend is selected (Apple or Google), then that backend is used for all operations within that run — the backend does not switch mid-run.
-
-**AC18 — Orphaned alarms from backend switch are accepted**
-Given the previous sync run used Apple Calendar and the current run falls back to Google Calendar (or vice versa), when the current run completes, then alarm events written by the previous backend remain in their respective calendar until a future run using that backend cleans them up. The system does not attempt cross-backend deletion.
-
-**AC19 — macOS-only constraint**
-Given the app is running on a non-macOS platform, when a sync run starts, then Apple Calendar backend is not attempted and the system proceeds directly with Google Calendar.
-
-**AC20 — Apple Calendar event data not persisted or transmitted**
-Given a sync run completes using the Apple Calendar backend, when any persistent state files are inspected, then no Apple Calendar event data (titles, start/end times, or descriptions) appears in them. When the backend performs reads or writes, no event data is transmitted to any remote network endpoint.
-**AC21 — Work and personal Apple Calendars are read-only**
-Given Apple Calendar is accessible, when a sync run executes, then no existing events in the work or personal Apple Calendars are modified or deleted by the system.
-
-**AC22 — Read results contain only tomorrow's events**
-Given Apple Calendar is accessible, when the sync reads tomorrow's events from the work or personal Apple Calendar, then no events whose date falls outside tomorrow's date range appear in the retrieved results.
-
-**AC23 — Apple Calendar backend requires no Google credentials**
-Given Apple Calendar is accessible and all three Apple Calendar names are configured, when no Google OAuth credentials or Google Calendar config are present, then a sync run completes successfully using the Apple Calendar backend.
-
-**AC24 — No user-facing backend selection option**
-Given the app's configuration and user interface, when inspected, then no user-facing option to manually select between Apple Calendar and Google Calendar backends is present; backend selection is automatic.
+**AC12 — No user-facing read source selection**
+Given the app's configuration and user interface, when inspected, then no user-facing option to manually select between Apple Calendar and Google Calendar as the event read source is present; selection is automatic.
