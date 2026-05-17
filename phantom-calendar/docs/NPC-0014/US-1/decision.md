@@ -1,0 +1,1 @@
+- 2026-05-17 — Decision: Initial state files created for US-1. Rationale: Planner phase complete. Impact: apple_calendar.py (new), drive_config.py, tests/test_apple_calendar.py (new), tests/test_drive_config.py.
