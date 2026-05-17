@@ -145,10 +145,8 @@ def _prompt_unknown_locations(
     alarm_time = current_alarm
 
     for location, entries in groups.items():
-        safe_location = location.replace('"', '\\"')
-        safe_titles = ", ".join(
-            '"' + e["title"].replace('"', '\\"') + '"' for e in entries
-        )
+        safe_location = location.replace('"', "'")
+        safe_titles = ", ".join(e["title"].replace('"', "'") for e in entries)
         prompt_text = (
             f"Location: {safe_location}\\n"
             f"Event(s): {safe_titles}\\n\\n"
