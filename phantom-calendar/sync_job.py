@@ -3,10 +3,11 @@
 import subprocess
 import sys
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import rumps
 
+import osaurus_client
 from calendar_reader import get_msi_time_blocks, get_personal_events
 from calendar_writer import run_calendar_write
 from compute import compute_alarm
@@ -16,6 +17,23 @@ _SYNC_LOCK = threading.Lock()
 _PENDING_RUN = threading.Event()
 
 
+def _ask_recurring_or_oneshot() -> bool:
+    """Ask whether to save the classification for future runs.
+
+    Returns True for Recurring, False for One-shot or cancellation.
+    """
+    script = (
+        'tell application "System Events" to set r to display dialog '
+        '"Save this for future runs?" '
+        'buttons {"One-shot", "Recurring"} default button "Recurring" '
+        'with title "Phantom Calendar"\n'
+        'if button returned of r is "Recurring" then return "Recurring"\n'
+        'return "One-shot"'
+    )
+    out, rc = _osascript(script)
+    return rc == 0 and out.strip() == "Recurring"
+
+
 def _classify_unknown_blocks(
     unknown_blocks: list, config: dict, current_alarm: "datetime | None"
 ) -> "tuple[list, datetime | None]":
@@ -23,9 +41,9 @@ def _classify_unknown_blocks(
 
     Returns (classifications, updated_alarm_time). Only integer-prep types are offered.
     Travel-time entries (e.g. 'travel+10') are excluded.
+    Recurring classifications are appended to the returned list; One-shot
+    classifications update the alarm time only.
     """
-    from datetime import timedelta
-
     meeting_type_prep = config.get("meeting_type_prep") or {}
     options = [
         (name, int(prep))
@@ -41,12 +59,24 @@ def _classify_unknown_blocks(
 
     for block in sorted(unknown_blocks, key=lambda b: b["start"]):
         start_str = block["start"].strftime("%H:%M")
+
+        # Get AI suggestion (belt-and-suspenders: client already catches all exceptions)
+        try:
+            suggestion = osaurus_client.suggest_meeting_type(
+                block.get("title", "Untitled"),
+                block.get("description", ""),
+                [name for name, _ in options],
+            )
+        except Exception:
+            suggestion = None
+
+        default_item = suggestion if suggestion else "Skip (keep default)"
         items_str = ", ".join(f'"{n}"' for n in option_names)
         script = (
             f'tell application "System Events" to set sel to '
             f"choose from list {{{items_str}}} "
             f'with prompt "Unknown block at {start_str} — what type of meeting is this?" '
-            f'default items {{"Skip (keep default)"}} '
+            f'default items {{"{default_item}"}} '
             f'with title "Phantom Calendar"\n'
             f"if sel is false then\n"
             f'  return "__cancelled__"\n'
@@ -73,14 +103,17 @@ def _classify_unknown_blocks(
         if alarm_time is None or candidate_alarm < alarm_time:
             alarm_time = candidate_alarm
 
-        entry = {
-            "start_time": block["start"].isoformat(),
-            "meeting_type": selected,
-            "prep_minutes": resolved,
-        }
-        if location:
-            entry["location"] = location
-        classifications.append(entry)
+        # Ask whether to save for future runs
+        recurring = _ask_recurring_or_oneshot()
+        if recurring:
+            entry = {
+                "start_time": block["start"].isoformat(),
+                "meeting_type": selected,
+                "prep_minutes": resolved,
+            }
+            if location:
+                entry["location"] = location
+            classifications.append(entry)
 
     return classifications, alarm_time
 
@@ -190,6 +223,87 @@ def _prompt_unknown_locations(
     return location_travel_minutes, alarm_time
 
 
+def _classify_personal_events(
+    personal_events: list, config: dict, current_alarm: "datetime | None"
+) -> "tuple[list, datetime | None]":
+    """Show a classification dialog for each personal calendar event.
+
+    Mirrors the MSI block classification flow: ask osaurus for a suggestion,
+    show a choose-from-list dialog, then ask Recurring vs One-shot.
+    Returns (classifications_delta, updated_alarm_time).
+    Recurring classifications are appended to the returned list; One-shot
+    updates the alarm time only.
+    """
+    meeting_type_prep = config.get("meeting_type_prep") or {}
+    options = [
+        (name, int(prep))
+        for name, prep in meeting_type_prep.items()
+        if isinstance(prep, int)
+    ]
+    if not options:
+        return [], current_alarm
+
+    option_names = [name for name, _ in options] + ["Skip (keep default)"]
+    classifications = []
+    alarm_time = current_alarm
+
+    for event in personal_events:
+        title = event.get("title", "Untitled")
+        description = event.get("description", "")
+        start = event.get("start")
+        if start is None:
+            continue
+
+        # Get AI suggestion
+        try:
+            suggestion = osaurus_client.suggest_meeting_type(
+                title,
+                description,
+                [name for name, _ in options],
+            )
+        except Exception:
+            suggestion = None
+
+        default_item = suggestion if suggestion else "Skip (keep default)"
+        safe_title = title.replace('"', "'")
+        items_str = ", ".join(f'"{n}"' for n in option_names)
+        start_str = start.strftime("%H:%M")
+        script = (
+            f'tell application "System Events" to set sel to '
+            f"choose from list {{{items_str}}} "
+            f'with prompt "Personal event at {start_str}: {safe_title}\\nWhat type of meeting is this?" '
+            f'default items {{"{default_item}"}} '
+            f'with title "Phantom Calendar"\n'
+            f"if sel is false then\n"
+            f'  return "__cancelled__"\n'
+            f"else\n"
+            f"  return item 1 of sel\n"
+            f"end if"
+        )
+        out, _ = _osascript(script)
+        selected = out.strip()
+        if not selected or selected in ("__cancelled__", "Skip (keep default)"):
+            continue
+        prep_minutes = next((p for n, p in options if n == selected), None)
+        if prep_minutes is None:
+            continue
+
+        candidate_alarm = start - timedelta(minutes=prep_minutes)
+        if alarm_time is None or candidate_alarm < alarm_time:
+            alarm_time = candidate_alarm
+
+        # Ask whether to save for future runs
+        recurring = _ask_recurring_or_oneshot()
+        if recurring:
+            classifications.append({
+                "start_time": start.isoformat(),
+                "meeting_type": selected,
+                "prep_minutes": prep_minutes,
+            })
+
+    return classifications, alarm_time
+
+
 def _show_popup(result: dict, config: dict | None = None) -> dict:
     """Show the alarm confirmation dialog using osascript (works from any thread)."""
     meeting_name = result.get("first_meeting_name")
@@ -219,6 +333,14 @@ def _show_popup(result: dict, config: dict | None = None) -> dict:
         location_travel_minutes, alarm_time = _prompt_unknown_locations(
             unknown_locs, config, alarm_time
         )
+
+    # Personal event type classification (normal mode only, not baseline)
+    personal_events = result.get("personal_events") or []
+    if personal_events and config and not result.get("is_baseline"):
+        personal_classifications, alarm_time = _classify_personal_events(
+            personal_events, config, alarm_time
+        )
+        classifications.extend(personal_classifications)
 
     alarm_str = alarm_time.strftime("%H:%M") if alarm_time else "—"
 
@@ -360,6 +482,10 @@ def run_nightly_sync(app_ref=None, target_date=None) -> None:
                 print(f"[DEBUG]   {e['start'].strftime('%H:%M')} — {e['title']}{loc}")
 
         result = compute_alarm(msi_blocks, personal_events, config, debug=debug)
+        # Attach raw personal events so _show_popup can pass them to _classify_personal_events
+        result["personal_events"] = [
+            e for e in personal_events if "Alarm" not in e.get("title", "")
+        ]
         alarm_time = result.get("alarm_time")
 
         if debug:
