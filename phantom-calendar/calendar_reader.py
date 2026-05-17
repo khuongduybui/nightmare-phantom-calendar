@@ -54,6 +54,8 @@ def get_msi_time_blocks(
                 {
                     "start": datetime.fromisoformat(start_str),
                     "end": datetime.fromisoformat(end_str),
+                    "title": event.get("summary") or "Untitled",
+                    "description": event.get("description") or "",
                 }
             )
 
@@ -66,7 +68,7 @@ def get_personal_events(
 ) -> list[dict]:
     """Return Personal calendar events for target_date (default: tomorrow).
 
-    Returns [{'title', 'start', 'end', 'location'}].
+    Returns [{'title', 'start', 'end', 'location', 'description'}].
     Events with only an all-day 'date' key are silently skipped.
     Results are sorted by start ascending.
     """
@@ -92,10 +94,11 @@ def get_personal_events(
         end_str = event.get("end", {}).get("dateTime")
         events.append(
             {
-                "title": event.get("summary", "Untitled"),
+                "title": event.get("summary") or "Untitled",
                 "start": datetime.fromisoformat(start_str),
                 "end": datetime.fromisoformat(end_str) if end_str else None,
                 "location": event.get("location") or None,
+                "description": event.get("description") or "",
             }
         )
 
