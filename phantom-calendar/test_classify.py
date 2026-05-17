@@ -6,9 +6,9 @@ Usage:
     uv run test_classify.py --title "Team retrospective" --description "Quarterly retro with the full team"
 """
 
-import argparse
 import sys
 
+import click
 import yaml
 from openai import OpenAI
 
@@ -51,17 +51,14 @@ def classify_event(
     return response.choices[0].message.content.strip()
 
 
-DEFAULT_MODEL = "foundation"
-
-
-def pick_model(client: OpenAI) -> str:
+def pick_model(client: OpenAI, default_model: str) -> str:
     models = client.models.list()
     ids = [m.id for m in models.data]
     if not ids:
         print("ERROR: no models available on the osaurus server.", file=sys.stderr)
         sys.exit(1)
-    if DEFAULT_MODEL in ids:
-        return DEFAULT_MODEL
+    if default_model in ids:
+        return default_model
     if len(ids) > 1:
         print("Available models:")
         for i, m in enumerate(ids):
@@ -72,15 +69,20 @@ def pick_model(client: OpenAI) -> str:
     return ids[0]
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Classify a calendar event via osaurus."
-    )
-    parser.add_argument("--title", help="Event title")
-    parser.add_argument("--description", default="", help="Event description")
-    parser.add_argument("--model", help="Model ID to use (auto-selected if omitted)")
-    args = parser.parse_args()
-
+@click.command()
+@click.option("--title", prompt="Event title", help="Event title")
+@click.option(
+    "--description",
+    default="",
+    prompt="Event description (optional)",
+    prompt_required=False,
+    help="Event description",
+)
+@click.option(
+    "--model", default=None, help="Model ID to use (auto-selected if omitted)"
+)
+def main(title: str, description: str, model: str | None):
+    """Classify a calendar event via osaurus."""
     osaurus = load_osaurus_config(OSAURUS_YAML)
     server = osaurus["server"].rstrip("/")
     api_key = osaurus["api_key"]
@@ -89,17 +91,11 @@ def main():
 
     client = OpenAI(base_url=f"{server}/v1", api_key=api_key)
 
-    model = args.model or pick_model(client)
-
-    title = args.title or input("Event title: ").strip()
-    description = (
-        args.description
-        if args.title
-        else input("Event description (optional): ").strip()
-    )
+    default_model = osaurus.get("default_module", "foundation")
+    model = model or pick_model(client, default_model)
 
     category = classify_event(title, description, categories, client, model)
-    print(category)
+    click.echo(category)
 
 
 if __name__ == "__main__":
