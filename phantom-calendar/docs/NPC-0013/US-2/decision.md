@@ -1,0 +1,1 @@
+- 2026-05-17T00:00:00Z — Decision: Initial state files created for US-2 (osaurus suggestion client module). Rationale: Planner phase complete. Impact: phantom-calendar/osaurus_client.py (new); phantom-calendar/requirements.txt; phantom-calendar/tests/test_osaurus_client.py (new); phantom-calendar/docs/runes/osaurus.md.

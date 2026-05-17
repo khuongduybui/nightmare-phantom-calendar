@@ -1,0 +1,1 @@
+- 2026-05-17T00:00:00Z — Decision: Initial state files created for US-1 (extend calendar readers to return title and description). Rationale: Planner phase complete. Impact: phantom-calendar/calendar_reader.py; phantom-calendar/tests/test_calendar_reader.py.
