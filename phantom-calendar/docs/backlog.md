@@ -4,6 +4,8 @@ Deferred items from MVP 2 feature definition.
 
 ## TOP PRIORITY
 
+- **NPC-0012** — Unknown personal-event location prompting (feature doc created)
+
 ---
 
 ## Scheduler
@@ -32,7 +34,6 @@ Deferred items from MVP 2 feature definition.
 - Distribute via drag-to-Applications or DMG
 
 ## Future (MVP 3+)
-- Location-based travel time: use `locations` config (location name → travel minutes) to adjust prep time based on meeting location
 - Client-specific prep overrides: use `client_overrides` config (client name → prep minutes) to override default prep per client
 - Replace osascript popup with native SwiftUI notification
 - Google Maps API for live travel time based on event location
