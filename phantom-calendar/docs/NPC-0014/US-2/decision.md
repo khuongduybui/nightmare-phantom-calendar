@@ -1,0 +1,1 @@
+- 2026-05-17 — Decision: Initial state files created for US-2. Rationale: Planner phase complete. Impact: sync_job.py, tests/test_sync_job.py, build/manual_tests.md, README.md.
