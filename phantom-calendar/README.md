@@ -9,6 +9,7 @@ A macOS menu bar app that syncs Google Calendar events to Google Drive.
 - macOS (required — uses `rumps` which is macOS-only)
 - Python 3.14
 - Google Cloud project with Calendar API and Drive API enabled
+- *(Optional)* Local [osaurus](https://github.com/osaurus) server running on `http://127.0.0.1:1337` for AI-assisted meeting classification — the app degrades gracefully when the server is unavailable
 
 ---
 
@@ -123,8 +124,9 @@ phantom-calendar/
 ├── app.py                macOS menu bar app (rumps)
 ├── main.py               Entry point
 ├── drive_config.py       Google Drive config read/parse/bootstrap (YAML)
-├── calendar_reader.py    Reads MSI time blocks and Personal calendar events
+├── calendar_reader.py    Reads MSI time blocks and Personal calendar events (title, description included)
 ├── compute.py            Matches meetings and computes alarm time
+├── osaurus_client.py     AI meeting-type suggestion via local osaurus server (openai-compatible)
 ├── preferences.py        Preferences window (osascript) — edit trigger time, timezone, prep minutes, calendar IDs
 ├── calendar_writer.py    Writes alarm event to Google Calendar; overrides baseline occurrence
 ├── sync_job.py           Nightly sync pipeline (config → compute → dialog → write), with lock
@@ -150,7 +152,8 @@ phantom-calendar/
     ├── test_sync_job.py      Nightly sync pipeline unit tests
     ├── test_scheduler.py     Scheduler unit tests
     ├── test_app_status.py    App status display and login item unit tests
-    └── test_on_demand_sync.py  On-demand sync queue unit tests
+    ├── test_on_demand_sync.py  On-demand sync queue unit tests
+    └── test_osaurus_client.py  osaurus AI suggestion client unit tests
 ```
 
 ---

@@ -27,7 +27,7 @@ default_module: foundation
 from openai import OpenAI
 client = OpenAI(base_url=f"{server}/v1", api_key=api_key)
 ```
-`server` must have any trailing slash stripped before appending `/v1`. The `openai` package is **not** in `requirements.txt` (it is a dev/test dependency only); install it separately with `uv pip install openai`.
+`server` must have any trailing slash stripped before appending `/v1`. The `openai` package **is** in `requirements.txt` as a runtime dependency (`openai>=1.0,<3`) — do not downgrade it to dev/test only.
 **Owner:** Implementer
 
 ---
@@ -62,11 +62,11 @@ Set `max_tokens` to a small value (e.g. 32) to avoid runaway completions.
 ## Rule: osaurus-not-in-production-pipeline
 
 **When:** Any feature proposal routes live sync traffic through osaurus.
-**Action:** Osaurus is a local server — it requires the user's machine to be running the osaurus process. Do **not** call osaurus from `sync_job.py` or `scheduler.py` as part of the nightly pipeline. Osaurus integration is limited to:
+**Action:** Osaurus is a local server — it requires the user's machine to be running the osaurus process. Do **not** call osaurus from `scheduler.py` or any unattended path that runs without user interaction. Osaurus integration is limited to:
 - Developer test scripts (e.g. `test_classify.py`)
-- Optional interactive classification flows triggered explicitly by the user
+- The interactive popup-driven classification helpers (`_classify_unknown_blocks`, `_classify_personal_events`) in `sync_job.py` — these require explicit user action and always degrade gracefully when the server is unavailable.
 
-If AI-assisted classification is needed in the live sync, design it as an opt-in step with a graceful fallback when the server is unavailable.
+The `osaurus_client` module must **never** be imported from `scheduler.py`, `app.py`, `main.py`, or `compute.py`.
 **Owner:** Feature-Review, QA
 
 ---

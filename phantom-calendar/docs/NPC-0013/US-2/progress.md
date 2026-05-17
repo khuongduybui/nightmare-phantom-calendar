@@ -1,18 +1,21 @@
 ---
-phase: Implementer
+phase: QA
 spec_hash: 'ba1561a5443c'
-status: NotStarted
-blockers: 'None'
+status: Done
+blockers: None
 ---
 
 ## Last Run
-- N/A
+- python -m pytest tests/ -v — PASS (191/191)
 
 ## Changes Since Last Iteration
-- State files initialized.
+- Created `osaurus_client.py` with `suggest_meeting_type()`: reads server/api_key/default_module from osaurus.yaml, issues one chat completion, validates response against categories, returns None on any failure (no retry), logs one stderr line.
+- Added `openai>=1.0,<3` to `requirements.txt`.
+- Created `tests/test_osaurus_client.py` with 21 tests covering all AC2.1–AC2.8.
+- Updated `docs/runes/osaurus.md`: promoted openai to runtime dep, updated osaurus-not-in-production-pipeline to allow interactive popup path.
 
 ## Next Steps
-- Create `phantom-calendar/osaurus_client.py` with `suggest_meeting_type(title, description, categories, timeout=3.0)`.
+- QA loop then Story-Review loop until both return PASS.
 - Use model `"foundation"`, `temperature=0`, `max_tokens=32`, no retry, exception → `None`.
 - Validate model response against `categories`; non-match → `None`.
 - Add `openai>=1.0,<3` to `phantom-calendar/requirements.txt`; install in venv via `uv pip install -r requirements.txt`.
