@@ -8,10 +8,11 @@ Apply during Implementer, QA, Story-Review, and Feature-Review phases.
 ## Rule: osaurus-config-location
 
 **When:** Any code reads the osaurus server URL or API key.
-**Action:** Always load both values from `phantom-calendar/osaurus.yaml`. Never hardcode the server address or API key. Schema:
+**Action:** Always load all values from `phantom-calendar/osaurus.yaml`. Never hardcode the server address, API key, or default model. Schema:
 ```yaml
 server: http://127.0.0.1:1337
 api_key: osk-v1.<token>
+default_module: foundation
 ```
 `osaurus.yaml` is gitignored — never commit it. A template file may be provided (e.g. `credentials.json.template` pattern).
 **Owner:** Implementer, Story-Review
@@ -34,13 +35,13 @@ client = OpenAI(base_url=f"{server}/v1", api_key=api_key)
 ## Rule: osaurus-model-selection
 
 **When:** Any script or module chooses a model to run on osaurus.
-**Action:** Prefer accepting a `--model` CLI argument or `model` parameter. When no model is specified, enumerate available models via `client.models.list()` and:
-- If the default model `"foundation"` is in the list, use it automatically.
-- If exactly one model is available (and it's not `"foundation"`), use it automatically.
+**Action:** Read the default model name from `osaurus.yaml` key `default_module` (fallback: `"foundation"` if the key is absent). Prefer accepting a `--model` CLI argument or `model` parameter to override. When no model is specified, enumerate available models via `client.models.list()` and:
+- If the config default model is in the list, use it automatically.
+- If exactly one model is available, use it automatically.
 - If multiple models are available, present a numbered list and prompt the user to select.
 - If no models are available, exit with a clear error message to stderr.
 
-The default model name is `"foundation"`. Store it as a module-level constant (`DEFAULT_MODEL = "foundation"`) so it can be overridden without hunting through logic.
+Never hardcode a model name — always read from the config file with `"foundation"` as the fallback default.
 **Owner:** Implementer
 
 ---

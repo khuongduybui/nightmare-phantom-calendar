@@ -1,6 +1,6 @@
 ---
 phase: Planner
-spec_hash: '757184e6135b'
+spec_hash: 'ba1561a5443c'
 status: Draft
 ---
 
@@ -16,7 +16,7 @@ status: Draft
 | Classification dialog | Existing osascript `choose from list` in `_classify_unknown_blocks()` (sync_job.py). |
 | One-shot vs recurring prompt | New osascript `display dialog` with buttons `Recurring` / `One-shot`, fired after type selection. |
 | Drive config recurring_meetings | `config["recurring_meetings"]`, written via `drive_config.append_recurring_meetings(classifications, config)`. |
-| osaurus | Local OpenAI-compatible server. Server URL + API key in `phantom-calendar/osaurus.yaml`. Model: `"foundation"`. |
+| osaurus | Local OpenAI-compatible server. Config in `phantom-calendar/osaurus.yaml`: `server`, `api_key`, `default_module` (fallback `"foundation"`). |
 | Sync popup | The osascript dialog flow in `_show_popup()` in sync_job.py. |
 | Baseline match | `result["is_baseline"] is True` from `compute_alarm()`. |
 | Pre-selected default item | `default items {{"<name>"}}` argument to the osascript `choose from list` command. |
@@ -74,9 +74,9 @@ A new isolated module that wraps the osaurus call. No integration into the sync 
       timeout: float = 3.0,
   ) -> str | None
   ```
-  - Loads `phantom-calendar/osaurus.yaml` lazily and reads `server` + `api_key`.
+  - Loads `phantom-calendar/osaurus.yaml` lazily and reads `server`, `api_key`, and `default_module` (fallback `"foundation"`).
   - Builds an `openai.OpenAI(base_url=f"{server}/v1", api_key=api_key)` client.
-  - Issues one `chat.completions.create(...)` request with model `"foundation"`, `temperature=0`, `max_tokens=32`, and the supplied timeout.
+  - Issues one `chat.completions.create(...)` request with model read from `default_module`, `temperature=0`, `max_tokens=32`, and the supplied timeout.
   - System prompt instructs the model to return exactly one category from `categories`, no punctuation, no explanation.
   - User message: `"Title: {title}\nDescription: {description}"`.
   - Validates the response text (stripped) against `categories`. If the stripped response exactly matches one of `categories`, return that category. Otherwise return `None`.
@@ -86,7 +86,7 @@ A new isolated module that wraps the osaurus call. No integration into the sync 
 - New test module: `phantom-calendar/tests/test_osaurus_client.py`.
 
 **Acceptance Criteria**
-- AC2.1 — `suggest_meeting_type(...)` issues exactly one chat completion with model `"foundation"`, `temperature=0`, `max_tokens=32`, and the timeout parameter forwarded to the openai client.
+- AC2.1 — `suggest_meeting_type(...)` issues exactly one chat completion with model read from `osaurus.yaml` key `default_module` (fallback `"foundation"`), `temperature=0`, `max_tokens=32`, and the timeout parameter forwarded to the openai client.
 - AC2.2 — Returns the matched category string when the model response (stripped) exactly matches one of `categories`.
 - AC2.3 — Returns `None` when the model response does not match any category in `categories`.
 - AC2.4 — Returns `None` when the openai client raises any exception (test cases: connection error, timeout, generic exception).
@@ -183,7 +183,7 @@ Maps to feature AC3, AC4, AC5, AC6, AC7, AC8, AC9, AC10, AC11, AC12, AC14.
 - **No tkinter** in `sync_job.py` or any path reachable from a rumps callback — osascript only (per `phantom-calendar.md` rune `no-tkinter-in-rumps-process`).
 - **No bare `python` / `pip`** — use `uv run` / `uv pip` per rune `venv-and-uv-conventions`.
 - **No hardcoded osaurus URL or API key** — always loaded from `osaurus.yaml` per rune `osaurus-config-location`.
-- **Model name** for osaurus calls is the constant `"foundation"` per rune `osaurus-model-selection`.
+- **Model name** for osaurus calls is read from `osaurus.yaml` key `default_module` (fallback `"foundation"`) per rune `osaurus-model-selection`.
 - **No retry** of the osaurus call.
 - **API key, event title, event description, and full response body** must not appear in stderr or any log.
 - **`osaurus.yaml`** must remain in `.gitignore`.
