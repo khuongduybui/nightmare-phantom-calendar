@@ -1,9 +1,7 @@
 """Unit tests for sync_job.py."""
 
-import sys
-import threading
 import unittest
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 
 MOCK_CONFIG = {

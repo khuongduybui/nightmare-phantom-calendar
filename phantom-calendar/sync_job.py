@@ -145,11 +145,14 @@ def _prompt_unknown_locations(
     alarm_time = current_alarm
 
     for location, entries in groups.items():
-        titles = ", ".join(f'"{e["title"]}"' for e in entries)
+        safe_location = location.replace('"', '\\"')
+        safe_titles = ", ".join(
+            '"' + e["title"].replace('"', '\\"') + '"' for e in entries
+        )
         prompt_text = (
-            f"Location: {location}\\n"
-            f"Event(s): {titles}\\n\\n"
-            f"How many minutes of travel time?"
+            f"Location: {safe_location}\\n"
+            f"Event(s): {safe_titles}\\n\\n"
+            "How many minutes of travel time?"
         )
         script = (
             f'tell application "System Events" to set r to display dialog '
@@ -362,7 +365,7 @@ def run_nightly_sync(app_ref=None, target_date=None) -> None:
         alarm_time = result.get("alarm_time")
 
         if debug:
-            print(f"[DEBUG] --- Alarm result ---")
+            print("[DEBUG] --- Alarm result ---")
             print(f"[DEBUG] First meeting : {result.get('first_meeting_name')}")
             mt = result.get("first_meeting_time")
             print(f"[DEBUG] Meeting time  : {mt.strftime('%H:%M') if mt else 'N/A'}")
