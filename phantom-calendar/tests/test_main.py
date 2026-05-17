@@ -18,7 +18,7 @@ class TestMainMissingCredentials(unittest.TestCase):
 
         captured_stderr = StringIO()
         with self.assertRaises(SystemExit) as ctx:
-            with patch("sys.stderr", captured_stderr):
+            with patch("sys.stderr", captured_stderr), patch("sys.argv", ["main"]):
                 import main
 
                 main.main()

@@ -13,8 +13,8 @@ locations:
   Home: 0
 meeting_type_prep:
   Daily standup: 5
-  In-person (far): travel+15
-  In-person (local): travel+10
+  In-person (far): 60
+  In-person (local): 30
   Interview: 30
   New client: 30
   New platform (first use): 15

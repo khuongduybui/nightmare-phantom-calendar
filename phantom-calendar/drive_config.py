@@ -9,6 +9,9 @@ from auth import get_drive_service
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# Local config.yaml path — used as default/fallback and kept in sync with Drive.
+CONFIG_YAML_PATH = os.path.join(BASE_DIR, "config.yaml")
+
 # Local file that persists the Drive config file ID across restarts.
 DRIVE_CONFIG_ID_FILE = os.path.join(BASE_DIR, ".drive_config_id")
 
@@ -37,8 +40,22 @@ def _save_config_file_id(file_id: str) -> None:
 
 CONFIG_FILE_ID = _load_config_file_id()
 
+# When True, read_config() returns the local config.yaml instead of fetching from Drive.
+_use_local_config: bool = False
+
+
+def set_local_config_mode(enabled: bool) -> None:
+    """Enable or disable local-config override mode.
+
+    When enabled, read_config() reads config.yaml from disk instead of Drive.
+    write_config() always mirrors to disk regardless of this flag.
+    """
+    global _use_local_config
+    _use_local_config = enabled
+
+
 # Default config — mirrors config.yaml at the project root.
-with open(os.path.join(BASE_DIR, "config.yaml"), "r") as _f:
+with open(CONFIG_YAML_PATH, "r") as _f:
     DEFAULT_CONFIG_YAML = _f.read()
 
 _DEFAULTS = {
@@ -60,7 +77,15 @@ _DEFAULTS = {
 def read_config() -> str:
     """Fetch config from Drive. Creates a new file if not found (404).
     Bootstraps with defaults if content is invalid YAML.
+
+    When local-config mode is active (--local-config flag), reads config.yaml
+    from disk instead of Drive.
     """
+    if _use_local_config:
+        print("[drive_config] Local-config mode: reading config.yaml from disk.")
+        with open(CONFIG_YAML_PATH) as f:
+            return f.read()
+
     global CONFIG_FILE_ID
     service = get_drive_service()
 
@@ -125,7 +150,7 @@ def bootstrap_config() -> None:
 
 
 def write_config(content: str) -> None:
-    """Upload content string to the Drive config file."""
+    """Upload content string to the Drive config file and mirror to local config.yaml."""
     service = get_drive_service()
     from googleapiclient.http import MediaIoBaseUpload
 
@@ -136,6 +161,13 @@ def write_config(content: str) -> None:
         fileId=CONFIG_FILE_ID,
         media_body=media,
     ).execute()
+
+    # Mirror to local file so config.yaml stays in sync with Drive.
+    try:
+        with open(CONFIG_YAML_PATH, "w") as f:
+            f.write(content)
+    except Exception as exc:
+        print(f"[drive_config] WARNING: Could not mirror config to local file — {exc}")
 
 
 def append_recurring_meetings(classifications: list, config: dict) -> None:
