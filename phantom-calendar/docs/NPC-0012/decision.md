@@ -1,0 +1,4 @@
+- 2026-05-16 — Decision: Feature created for NPC-0012. Extends the NPC-0007 unknown-block classification pattern to personal calendar events with unrecognised location strings.
+- 2026-05-16 — Decision: Unknown location detection is in `compute_alarm()` (result dict), not in the popup — keeps compute layer responsible for identifying gaps.
+- 2026-05-16 — Decision: Only non-empty, non-Home, unrecognised locations are surfaced. Empty location and "Home" already resolve correctly (0 travel).
+- 2026-05-16 — Decision: User input of 0 travel minutes is treated as "no save" — avoids polluting `config["locations"]` with entries that add no value.
