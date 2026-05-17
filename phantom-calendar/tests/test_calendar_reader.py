@@ -2,24 +2,28 @@
 
 import unittest
 from datetime import date, datetime, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytz
 
 
-def _make_event(summary, start_dt, end_dt=None, all_day=False):
+def _make_event(summary, start_dt, end_dt=None, all_day=False, description=None):
     """Helper to build a mock Google Calendar API event dict."""
     if all_day:
-        return {
+        event = {
             "summary": summary,
             "start": {"date": start_dt.strftime("%Y-%m-%d")},
             "end": {"date": start_dt.strftime("%Y-%m-%d")},
         }
-    return {
-        "summary": summary,
-        "start": {"dateTime": start_dt.isoformat()},
-        "end": {"dateTime": end_dt.isoformat()} if end_dt else {},
-    }
+    else:
+        event = {
+            "summary": summary,
+            "start": {"dateTime": start_dt.isoformat()},
+            "end": {"dateTime": end_dt.isoformat()} if end_dt else {},
+        }
+    if description is not None:
+        event["description"] = description
+    return event
 
 
 class TestGetTomorrowRange(unittest.TestCase):
@@ -38,7 +42,7 @@ class TestGetTomorrowRange(unittest.TestCase):
 class TestGetMsiTimeBlocks(unittest.TestCase):
 
     @patch("calendar_reader.get_calendar_service")
-    def test_get_msi_time_blocks_returns_start_end_only(self, mock_svc):
+    def test_get_msi_time_blocks_returns_expected_keys(self, mock_svc):
         tz = pytz.timezone("America/New_York")
         tomorrow = date.today() + timedelta(days=1)
         start_dt = tz.localize(
@@ -48,14 +52,46 @@ class TestGetMsiTimeBlocks(unittest.TestCase):
             datetime(tomorrow.year, tomorrow.month, tomorrow.day, 9, 45)
         )
         mock_svc.return_value.events.return_value.list.return_value.execute.return_value = {
-            "items": [_make_event("Secret Meeting", start_dt, end_dt)]
+            "items": [_make_event("Secret Meeting", start_dt, end_dt, description="Quarterly check-in")]
         }
         result = calendar_reader.get_msi_time_blocks()
         self.assertEqual(len(result), 1)
         self.assertIn("start", result[0])
         self.assertIn("end", result[0])
-        self.assertNotIn("title", result[0])
+        self.assertEqual(result[0]["title"], "Secret Meeting")
+        self.assertEqual(result[0]["description"], "Quarterly check-in")
         self.assertNotIn("summary", result[0])
+
+    @patch("calendar_reader.get_calendar_service")
+    def test_get_msi_time_blocks_summary_absent_defaults_untitled(self, mock_svc):
+        tz = pytz.timezone("America/New_York")
+        tomorrow = date.today() + timedelta(days=1)
+        start_dt = tz.localize(datetime(tomorrow.year, tomorrow.month, tomorrow.day, 9, 0))
+        end_dt = tz.localize(datetime(tomorrow.year, tomorrow.month, tomorrow.day, 9, 30))
+        # API event with no "summary" key
+        event = {
+            "start": {"dateTime": start_dt.isoformat()},
+            "end": {"dateTime": end_dt.isoformat()},
+        }
+        mock_svc.return_value.events.return_value.list.return_value.execute.return_value = {
+            "items": [event]
+        }
+        result = calendar_reader.get_msi_time_blocks()
+        self.assertEqual(result[0]["title"], "Untitled")
+        self.assertEqual(result[0]["description"], "")
+
+    @patch("calendar_reader.get_calendar_service")
+    def test_get_msi_time_blocks_description_absent_defaults_empty(self, mock_svc):
+        tz = pytz.timezone("America/New_York")
+        tomorrow = date.today() + timedelta(days=1)
+        start_dt = tz.localize(datetime(tomorrow.year, tomorrow.month, tomorrow.day, 9, 0))
+        end_dt = tz.localize(datetime(tomorrow.year, tomorrow.month, tomorrow.day, 9, 30))
+        # description omitted entirely
+        mock_svc.return_value.events.return_value.list.return_value.execute.return_value = {
+            "items": [_make_event("No-desc Meeting", start_dt, end_dt)]
+        }
+        result = calendar_reader.get_msi_time_blocks()
+        self.assertEqual(result[0]["description"], "")
 
     @patch("calendar_reader.get_calendar_service")
     def test_get_msi_time_blocks_skips_all_day_events(self, mock_svc):
@@ -103,12 +139,42 @@ class TestGetPersonalEvents(unittest.TestCase):
             datetime(tomorrow.year, tomorrow.month, tomorrow.day, 10, 30)
         )
         mock_svc.return_value.events.return_value.list.return_value.execute.return_value = {
-            "items": [_make_event("Stand-up", start_dt, end_dt)]
+            "items": [_make_event("Stand-up", start_dt, end_dt, description="Daily team check-in")]
         }
         result = calendar_reader.get_personal_events()
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["title"], "Stand-up")
+        self.assertEqual(result[0]["description"], "Daily team check-in")
         self.assertIsInstance(result[0]["start"], datetime)
+
+    @patch("calendar_reader.get_calendar_service")
+    def test_get_personal_events_description_absent_defaults_empty(self, mock_svc):
+        tz = pytz.timezone("America/New_York")
+        tomorrow = date.today() + timedelta(days=1)
+        start_dt = tz.localize(datetime(tomorrow.year, tomorrow.month, tomorrow.day, 10, 0))
+        end_dt = tz.localize(datetime(tomorrow.year, tomorrow.month, tomorrow.day, 10, 30))
+        mock_svc.return_value.events.return_value.list.return_value.execute.return_value = {
+            "items": [_make_event("No-desc event", start_dt, end_dt)]
+        }
+        result = calendar_reader.get_personal_events()
+        self.assertEqual(result[0]["description"], "")
+
+    @patch("calendar_reader.get_calendar_service")
+    def test_get_personal_events_summary_absent_defaults_untitled(self, mock_svc):
+        tz = pytz.timezone("America/New_York")
+        tomorrow = date.today() + timedelta(days=1)
+        start_dt = tz.localize(datetime(tomorrow.year, tomorrow.month, tomorrow.day, 10, 0))
+        end_dt = tz.localize(datetime(tomorrow.year, tomorrow.month, tomorrow.day, 10, 30))
+        # API event with no "summary" key
+        event = {
+            "start": {"dateTime": start_dt.isoformat()},
+            "end": {"dateTime": end_dt.isoformat()},
+        }
+        mock_svc.return_value.events.return_value.list.return_value.execute.return_value = {
+            "items": [event]
+        }
+        result = calendar_reader.get_personal_events()
+        self.assertEqual(result[0]["title"], "Untitled")
 
     @patch("calendar_reader.get_calendar_service")
     def test_get_personal_events_empty_list(self, mock_svc):
