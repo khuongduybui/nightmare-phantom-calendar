@@ -38,3 +38,4 @@ Deferred items from MVP 2 feature definition.
 - Watch for calendar change events and auto-recompute
 - Config editor UI inside the app (instead of editing Google Drive directly)
 - Multiple timezone support
+- Multiple work calendars
