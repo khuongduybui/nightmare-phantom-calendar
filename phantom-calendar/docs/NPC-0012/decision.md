@@ -2,3 +2,7 @@
 - 2026-05-16 — Decision: Unknown location detection is in `compute_alarm()` (result dict), not in the popup — keeps compute layer responsible for identifying gaps.
 - 2026-05-16 — Decision: Only non-empty, non-Home, unrecognised locations are surfaced. Empty location and "Home" already resolve correctly (0 travel).
 - 2026-05-16 — Decision: User input of 0 travel minutes is treated as "no save" — avoids polluting `config["locations"]` with entries that add no value.
+- 2026-05-16 — Decision: Two events with the same unknown location string produce two entries in `unknown_personal_locations` (one per event, not deduplicated). The popup groups them into one dialog so the user sees the full context.
+- 2026-05-16 — Decision: `append_locations()` added to `drive_config.py` (parallel to `append_recurring_meetings`) — keeps Drive write logic in one module.
+- 2026-05-16 — Decision: `_prompt_unknown_locations()` returns `(location_travel_minutes, updated_alarm_time)` matching the `_classify_unknown_blocks` signature convention.
+- 2026-05-16T00:00:00 — Decision: Spec approved by human. Rationale: All user stories reviewed and accepted. spec_hash: 75972f8a557d. Impact: docs/NPC-0012/spec.md approved; per-story state files updated.

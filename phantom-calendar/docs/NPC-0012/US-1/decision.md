@@ -1,0 +1,3 @@
+- 2026-05-16T00:00:00 — Decision: State files initialized for US-1. Rationale: Spec approved (hash 75972f8a557d). Impact: compute.py (add unknown_personal_locations detection + result key), tests/test_compute.py (new unit tests for AC 1.1–1.5).
+- 2026-05-16 — Decision: Detection condition uses `event_loc.strip()` guard in addition to non-empty check to handle whitespace-only strings. Rationale: Defensive — consistent with existing `event_location.strip() or "Home"` pattern in resolve_prep_minutes. Impact: compute.py.
+- 2026-05-16 — Decision: Debug print for unknown location fires after the existing prep-minutes debug line (not replacing it) so the log remains readable without duplication. Impact: compute.py.

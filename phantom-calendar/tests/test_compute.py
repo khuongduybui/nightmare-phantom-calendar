@@ -113,11 +113,17 @@ class TestComputeAlarm(unittest.TestCase):
         self.assertTrue(result["is_baseline"])
         self.assertEqual(result["all_meetings"], [])
 
-    def test_compute_alarm_result_has_all_7_keys(self):
+    def test_compute_alarm_result_has_all_8_keys(self):
         result = compute.compute_alarm([], [], BASE_CONFIG)
         expected_keys = {
-            "first_meeting_name", "first_meeting_time", "prep_minutes",
-            "alarm_time", "is_baseline", "all_meetings", "unknown_blocks",
+            "first_meeting_name",
+            "first_meeting_time",
+            "prep_minutes",
+            "alarm_time",
+            "is_baseline",
+            "all_meetings",
+            "unknown_blocks",
+            "unknown_personal_locations",
         }
         self.assertEqual(set(result.keys()), expected_keys)
 
@@ -130,6 +136,117 @@ class TestComputeAlarm(unittest.TestCase):
         msi_blocks = [{"start": _dt(12, 30), "end": _dt(12, 45)}]
         result = compute.compute_alarm(msi_blocks, [], BASE_CONFIG)
         self.assertFalse(result["is_baseline"])
+
+
+CONFIG_WITH_LOCATIONS = {
+    **BASE_CONFIG,
+    "locations": {
+        "Home": 0,
+        "Office": 25,
+    },
+}
+
+
+class TestUnknownPersonalLocations(unittest.TestCase):
+
+    def test_unknown_location_detected(self):
+        # AC 1.1 — non-empty, non-Home, not in locations → detected
+        personal = [
+            {
+                "title": "Doctor",
+                "start": _dt(10, 0),
+                "end": _dt(10, 30),
+                "location": "200 N Nelson Dr, Fountain Inn SC",
+            }
+        ]
+        result = compute.compute_alarm([], personal, CONFIG_WITH_LOCATIONS)
+        self.assertEqual(len(result["unknown_personal_locations"]), 1)
+        entry = result["unknown_personal_locations"][0]
+        self.assertEqual(entry["title"], "Doctor")
+        self.assertEqual(entry["location"], "200 N Nelson Dr, Fountain Inn SC")
+        self.assertEqual(entry["start_time"], _dt(10, 0).isoformat())
+
+    def test_known_location_excluded(self):
+        # AC 1.2 — location IS in config["locations"] → not surfaced
+        personal = [
+            {
+                "title": "Office meeting",
+                "start": _dt(10, 0),
+                "end": _dt(10, 30),
+                "location": "Office",
+            }
+        ]
+        result = compute.compute_alarm([], personal, CONFIG_WITH_LOCATIONS)
+        self.assertEqual(result["unknown_personal_locations"], [])
+
+    def test_none_location_excluded(self):
+        # AC 1.3 — None location → not surfaced
+        personal = [
+            {"title": "Call", "start": _dt(10, 0), "end": _dt(10, 30), "location": None}
+        ]
+        result = compute.compute_alarm([], personal, CONFIG_WITH_LOCATIONS)
+        self.assertEqual(result["unknown_personal_locations"], [])
+
+    def test_empty_string_location_excluded(self):
+        # AC 1.3 — empty string location → not surfaced
+        personal = [
+            {"title": "Call", "start": _dt(10, 0), "end": _dt(10, 30), "location": ""}
+        ]
+        result = compute.compute_alarm([], personal, CONFIG_WITH_LOCATIONS)
+        self.assertEqual(result["unknown_personal_locations"], [])
+
+    def test_home_location_excluded(self):
+        # AC 1.4 — "Home" → not surfaced
+        personal = [
+            {
+                "title": "WFH",
+                "start": _dt(10, 0),
+                "end": _dt(10, 30),
+                "location": "Home",
+            }
+        ]
+        result = compute.compute_alarm([], personal, CONFIG_WITH_LOCATIONS)
+        self.assertEqual(result["unknown_personal_locations"], [])
+
+    def test_two_events_same_unknown_location_not_deduplicated(self):
+        # AC 1.5 — two events, same unknown location → two entries
+        personal = [
+            {
+                "title": "Lunch",
+                "start": _dt(12, 0),
+                "end": _dt(13, 0),
+                "location": "Gym",
+            },
+            {
+                "title": "Dinner",
+                "start": _dt(18, 0),
+                "end": _dt(19, 0),
+                "location": "Gym",
+            },
+        ]
+        result = compute.compute_alarm([], personal, CONFIG_WITH_LOCATIONS)
+        self.assertEqual(len(result["unknown_personal_locations"]), 2)
+        titles = {e["title"] for e in result["unknown_personal_locations"]}
+        self.assertEqual(titles, {"Lunch", "Dinner"})
+
+    def test_unknown_personal_locations_always_present(self):
+        # AC 1.7 — key always present even with no events
+        result = compute.compute_alarm([], [], BASE_CONFIG)
+        self.assertIn("unknown_personal_locations", result)
+        self.assertEqual(result["unknown_personal_locations"], [])
+
+    def test_alarm_events_not_surfaced_as_unknown_locations(self):
+        # Alarm events are skipped entirely — should not appear in unknown_personal_locations
+        personal = [
+            {
+                "title": "Daily Standup Alarm",
+                "start": _dt(9, 25),
+                "end": _dt(9, 30),
+                "location": "Mystery Hall",
+            }
+        ]
+        result = compute.compute_alarm([], personal, CONFIG_WITH_LOCATIONS)
+        self.assertEqual(result["unknown_personal_locations"], [])
 
 
 import compute  # noqa: E402

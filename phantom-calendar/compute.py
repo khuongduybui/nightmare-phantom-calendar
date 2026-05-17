@@ -88,7 +88,7 @@ def compute_alarm(
 ) -> dict:
     """Compute the alarm time for tomorrow's first meeting.
 
-    Returns a dict with exactly 7 keys:
+    Returns a dict with exactly 8 keys:
     - first_meeting_name: str | None
     - first_meeting_time: datetime | None
     - prep_minutes: int
@@ -96,14 +96,16 @@ def compute_alarm(
     - is_baseline: bool
     - all_meetings: list
     - unknown_blocks: list
+    - unknown_personal_locations: list
     """
+
     recurring_meetings = config.get("recurring_meetings", [])
     default_prep = config.get("default_prep_minutes", 30)
     baseline_title = config.get("baseline_event_title", "")
     baseline_time_str = config.get("baseline_event_time", "")
 
     if debug:
-        print(f"[DEBUG] --- compute_alarm ---")
+        print("[DEBUG] --- compute_alarm ---")
         print(
             f"[DEBUG] default_prep={default_prep}, baseline='{baseline_title}' @ {baseline_time_str}"
         )
@@ -111,6 +113,7 @@ def compute_alarm(
 
     candidates = []
     unknown_blocks = []
+    unknown_personal_locations = []
 
     # Process MSI blocks
     for block in msi_blocks:
@@ -152,12 +155,34 @@ def compute_alarm(
             continue
         event_loc = event.get("location")  # may be None or a string
         prep = resolve_prep_minutes(event, config, event_location=event_loc)
+        if (
+            event_loc
+            and event_loc.strip()
+            and event_loc != "Home"
+            and event_loc not in config.get("locations", {})
+        ):
+            unknown_personal_locations.append(
+                {
+                    "title": event["title"],
+                    "start_time": event["start"].isoformat(),
+                    "location": event_loc,
+                }
+            )
         if debug:
             loc_str = f" @ {event_loc}" if event_loc else ""
             print(
                 f"[DEBUG] Personal '{event['title']}'{loc_str} @ {event['start'].strftime('%H:%M')} "
                 f"→ prep={prep} min"
             )
+            if (
+                event_loc
+                and event_loc.strip()
+                and event_loc != "Home"
+                and event_loc not in config.get("locations", {})
+            ):
+                print(
+                    f"[DEBUG] Personal '{event['title']}' @ {event_loc} → unknown location (prep=0 min)"
+                )
         candidates.append({
             "name": event["title"],
             "time": event["start"],
@@ -176,6 +201,7 @@ def compute_alarm(
             "is_baseline": True,
             "all_meetings": [],
             "unknown_blocks": unknown_blocks,
+            "unknown_personal_locations": unknown_personal_locations,
         }
 
     # Sort by time and pick the earliest
@@ -209,6 +235,7 @@ def compute_alarm(
         "is_baseline": is_baseline,
         "all_meetings": candidates,
         "unknown_blocks": unknown_blocks,
+        "unknown_personal_locations": unknown_personal_locations,
     }
 
 
