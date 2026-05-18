@@ -1,6 +1,9 @@
 """Compute module — matches MSI blocks to meetings and computes alarm time."""
 
+import logging
 from datetime import datetime, timedelta
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_fixed_minutes(val) -> int:
@@ -104,12 +107,14 @@ def compute_alarm(
     baseline_title = config.get("baseline_event_title", "")
     baseline_time_str = config.get("baseline_event_time", "")
 
-    if debug:
-        print("[DEBUG] --- compute_alarm ---")
-        print(
-            f"[DEBUG] default_prep={default_prep}, baseline='{baseline_title}' @ {baseline_time_str}"
-        )
-        print(f"[DEBUG] {len(recurring_meetings)} recurring meeting(s) in config")
+    logger.debug("--- compute_alarm ---")
+    logger.debug(
+        "default_prep=%s, baseline='%s' @ %s",
+        default_prep,
+        baseline_title,
+        baseline_time_str,
+    )
+    logger.debug("%d recurring meeting(s) in config", len(recurring_meetings))
 
     candidates = []
     unknown_blocks = []
@@ -120,11 +125,13 @@ def compute_alarm(
         matched = match_block_to_meeting(block, recurring_meetings)
         if matched:
             prep = resolve_prep_minutes(matched, config)
-            if debug:
-                print(
-                    f"[DEBUG] MSI {block['start'].strftime('%H:%M')} → matched '{matched['name']}' "
-                    f"(type={matched.get('meeting_type')}, prep={prep} min)"
-                )
+            logger.debug(
+                "MSI %s → matched '%s' (type=%s, prep=%d min)",
+                block["start"].strftime("%H:%M"),
+                matched["name"],
+                matched.get("meeting_type"),
+                prep,
+            )
             candidates.append({
                 "name": matched["name"],
                 "time": block["start"],
@@ -132,11 +139,11 @@ def compute_alarm(
                 "source": "msi_known",
             })
         else:
-            if debug:
-                print(
-                    f"[DEBUG] MSI {block['start'].strftime('%H:%M')} → no match — "
-                    f"treated as unknown (default prep={default_prep} min)"
-                )
+            logger.debug(
+                "MSI %s → no match — treated as unknown (default prep=%d min)",
+                block["start"].strftime("%H:%M"),
+                default_prep,
+            )
             unknown_blocks.append(block)
             candidates.append({
                 "name": "Unknown MSI meeting",
@@ -148,10 +155,11 @@ def compute_alarm(
     # Process personal events — exclude alarm events
     for event in personal_events:
         if "Alarm" in event.get("title", ""):
-            if debug:
-                print(
-                    f"[DEBUG] Personal '{event['title']}' @ {event['start'].strftime('%H:%M')} → skipped (alarm event)"
-                )
+            logger.debug(
+                "Personal '%s' @ %s → skipped (alarm event)",
+                event["title"],
+                event["start"].strftime("%H:%M"),
+            )
             continue
         event_loc = event.get("location")  # may be None or a string
         prep = resolve_prep_minutes(event, config, event_location=event_loc)
@@ -168,21 +176,19 @@ def compute_alarm(
                     "location": event_loc,
                 }
             )
-        if debug:
-            loc_str = f" @ {event_loc}" if event_loc else ""
-            print(
-                f"[DEBUG] Personal '{event['title']}'{loc_str} @ {event['start'].strftime('%H:%M')} "
-                f"→ prep={prep} min"
+            logger.debug(
+                "Personal '%s' @ %s → unknown location (prep=0 min)",
+                event["title"],
+                event_loc,
             )
-            if (
-                event_loc
-                and event_loc.strip()
-                and event_loc != "Home"
-                and event_loc not in config.get("locations", {})
-            ):
-                print(
-                    f"[DEBUG] Personal '{event['title']}' @ {event_loc} → unknown location (prep=0 min)"
-                )
+        loc_str = f" @ {event_loc}" if event_loc else ""
+        logger.debug(
+            "Personal '%s'%s @ %s → prep=%d min",
+            event["title"],
+            loc_str,
+            event["start"].strftime("%H:%M"),
+            prep,
+        )
         candidates.append({
             "name": event["title"],
             "time": event["start"],
@@ -191,8 +197,7 @@ def compute_alarm(
         })
 
     if not candidates:
-        if debug:
-            print("[DEBUG] No candidates — returning empty result (baseline=True)")
+        logger.debug("No candidates — returning empty result (baseline=True)")
         return {
             "first_meeting_name": None,
             "first_meeting_time": None,
@@ -209,23 +214,28 @@ def compute_alarm(
     first = candidates[0]
     alarm_time = first["time"] - timedelta(minutes=first["prep_minutes"])
 
-    if debug:
-        print(f"[DEBUG] {len(candidates)} candidate(s) sorted by time:")
-        for c in candidates:
-            print(
-                f"[DEBUG]   [{c['source']}] {c['time'].strftime('%H:%M')} — {c['name']} (prep={c['prep_minutes']} min)"
-            )
-        print(
-            f"[DEBUG] First meeting: '{first['name']}' @ {first['time'].strftime('%H:%M')}, alarm → {alarm_time.strftime('%H:%M')}"
+    logger.debug("%d candidate(s) sorted by time:", len(candidates))
+    for c in candidates:
+        logger.debug(
+            "  [%s] %s — %s (prep=%d min)",
+            c["source"],
+            c["time"].strftime("%H:%M"),
+            c["name"],
+            c["prep_minutes"],
         )
+    logger.debug(
+        "First meeting: '%s' @ %s, alarm → %s",
+        first["name"],
+        first["time"].strftime("%H:%M"),
+        alarm_time.strftime("%H:%M"),
+    )
 
     # Check if alarm matches the baseline
     is_baseline = _is_baseline_alarm(
         first["name"], alarm_time, baseline_title, baseline_time_str
     )
 
-    if debug:
-        print(f"[DEBUG] is_baseline={is_baseline}")
+    logger.debug("is_baseline=%s", is_baseline)
 
     return {
         "first_meeting_name": first["name"],

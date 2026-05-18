@@ -1,11 +1,14 @@
 """Drive config — reads, bootstraps, and parses YAML config from Google Drive."""
 
 import io
+import logging
 import os
 
 import yaml
 
 from auth import get_drive_service
+
+logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -83,7 +86,7 @@ def read_config() -> str:
     from disk instead of Drive.
     """
     if _use_local_config:
-        print("[drive_config] Local-config mode: reading config.yaml from disk.")
+        logger.info("Local-config mode: reading config.yaml from disk.")
         with open(CONFIG_YAML_PATH) as f:
             return f.read()
 
@@ -95,11 +98,11 @@ def read_config() -> str:
         raw = request.execute()
     except Exception as exc:
         # 404 or any other error — create a fresh config file on Drive
-        print(f"[drive_config] Config file not found ({exc}); creating new file on Drive.")
+        logger.info("Config file not found (%s); creating new file on Drive.", exc)
         new_id = _create_config_file(service)
         CONFIG_FILE_ID = new_id
         _save_config_file_id(new_id)
-        print(f"[drive_config] Created new Drive config file: {new_id}")
+        logger.info("Created new Drive config file: %s", new_id)
         return DEFAULT_CONFIG_YAML
 
     if isinstance(raw, bytes):
@@ -168,7 +171,7 @@ def write_config(content: str) -> None:
         with open(CONFIG_YAML_PATH, "w") as f:
             f.write(content)
     except Exception as exc:
-        print(f"[drive_config] WARNING: Could not mirror config to local file — {exc}")
+        logger.warning("Could not mirror config to local file — %s", exc)
 
 
 def append_recurring_meetings(classifications: list, config: dict) -> None:

@@ -16,19 +16,17 @@ class TestMainMissingCredentials(unittest.TestCase):
             "credentials.json not found at /some/path/credentials.json"
         )
 
-        captured_stderr = StringIO()
-        with self.assertRaises(SystemExit) as ctx:
-            with patch("sys.stderr", captured_stderr), patch("sys.argv", ["main"]):
+        with self.assertRaises(SystemExit) as ctx, self.assertLogs(
+            "main", level="ERROR"
+        ) as log_ctx:
+            with patch("sys.argv", ["main"]):
                 import main
 
                 main.main()
 
+        self.assertTrue(any("credentials.json" in m for m in log_ctx.output))
+
         self.assertEqual(ctx.exception.code, 1)
-        error_output = captured_stderr.getvalue()
-        self.assertIn("credentials.json", error_output)
-        self.assertIn("Error", error_output)
-        # No raw traceback — just a readable message
-        self.assertNotIn("Traceback", error_output)
         # App must not have been launched
         mock_app_cls.assert_not_called()
 

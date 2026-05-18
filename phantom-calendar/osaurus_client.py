@@ -4,11 +4,13 @@ Provides suggest_meeting_type() for use by the sync popup classification flow.
 Never call this module from scheduler.py or any unattended pipeline path.
 """
 
+import logging
 import os
-import sys
 
 import yaml
 from openai import OpenAI
+
+logger = logging.getLogger(__name__)
 
 _OSAURUS_YAML = os.path.join(os.path.dirname(os.path.abspath(__file__)), "osaurus.yaml")
 _DEFAULT_MODEL_FALLBACK = "foundation"
@@ -42,7 +44,7 @@ def suggest_meeting_type(
     try:
         config = _load_config()
     except Exception as exc:
-        print(f"[osaurus_client] WARNING: {type(exc).__name__}", file=sys.stderr)
+        logger.warning("config load failed: %s", type(exc).__name__)
         return None
 
     server = (config.get("server") or "").rstrip("/")
@@ -71,7 +73,7 @@ def suggest_meeting_type(
         )
         result = response.choices[0].message.content.strip()
     except Exception as exc:
-        print(f"[osaurus_client] WARNING: {type(exc).__name__}", file=sys.stderr)
+        logger.warning("completions request failed: %s", type(exc).__name__)
         return None
 
     if result in categories:

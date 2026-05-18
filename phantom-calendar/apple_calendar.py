@@ -1,23 +1,16 @@
 """Apple Calendar reader — reads events from macOS Calendar.app via ical-guy CLI."""
 
 import json
+import logging
 import os
 import platform
 import shutil
 import subprocess
-import sys
 from datetime import date, datetime
 
 import pytz
 
-# Set PHANTOM_APPLE_DEBUG=1 in the environment to enable verbose ical-guy logging.
-_DEBUG = os.environ.get("PHANTOM_APPLE_DEBUG", "") == "1"
-
-
-def _dbg(msg: str) -> None:
-    """Print a debug line to stderr when PHANTOM_APPLE_DEBUG=1."""
-    if _DEBUG:
-        print(f"[apple_calendar] {msg}", file=sys.stderr)
+logger = logging.getLogger(__name__)
 
 # Homebrew installs ical-guy here on Apple Silicon and Intel Macs.
 # When the app is launched outside a login shell (launchd, Finder, etc.) the
@@ -54,17 +47,17 @@ def is_accessible() -> bool:
     """
     try:
         system = platform.system()
-        _dbg(f"platform.system() = {system!r}")
+        logger.debug("platform.system() = %r", system)
         if system != "Darwin":
             return False
 
         ver_str = platform.mac_ver()[0]
-        _dbg(f"macOS version = {ver_str!r}")
+        logger.debug("macOS version = %r", ver_str)
         if not ver_str or int(ver_str.split(".")[0]) < 14:
             return False
 
         binary = _ical_guy_path()
-        _dbg(f"ical-guy binary = {binary!r}")
+        logger.debug("ical-guy binary = %r", binary)
         if binary is None:
             return False
 
@@ -73,29 +66,29 @@ def is_accessible() -> bool:
         # that flag is only supported by the `events` subcommand and causes a
         # Swift fatalError (exit 133) on `calendars`.
         cmd = [binary, "calendars"]
-        _dbg(f"probe cmd: {cmd}")
+        logger.debug("probe cmd: %s", cmd)
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=15,
         )
-        _dbg(f"probe exit={result.returncode}")
-        _dbg(f"probe stdout={result.stdout[:500]!r}")
+        logger.debug("probe exit=%d", result.returncode)
+        logger.debug("probe stdout=%r", result.stdout[:500])
         if result.stderr.strip():
-            _dbg(f"probe stderr={result.stderr.strip()!r}")
+            logger.debug("probe stderr=%r", result.stderr.strip())
         if result.returncode != 0:
-            print(
-                f"[apple_calendar] ical-guy probe failed (exit {result.returncode}): "
-                f"{result.stderr.strip() or '(no stderr)'}",
-                file=sys.stderr,
+            logger.warning(
+                "ical-guy probe failed (exit %d): %s",
+                result.returncode,
+                result.stderr.strip() or "(no stderr)",
             )
             return False
 
         json.loads(result.stdout)
         return True
     except Exception as exc:
-        _dbg(f"is_accessible exception: {exc}")
+        logger.debug("is_accessible exception: %s", exc)
         return False
 
 
@@ -135,17 +128,17 @@ def get_tomorrow_events(
     if exclude_calendars:
         args.extend(["--exclude-calendars", ",".join(exclude_calendars)])
 
-    _dbg(f"events cmd: {args}")
+    logger.debug("events cmd: %s", args)
     result = subprocess.run(
         args,
         capture_output=True,
         text=True,
         timeout=15,
     )
-    _dbg(f"events exit={result.returncode}")
-    _dbg(f"events stdout={result.stdout[:1000]!r}")
+    logger.debug("events exit=%d", result.returncode)
+    logger.debug("events stdout=%r", result.stdout[:1000])
     if result.stderr.strip():
-        _dbg(f"events stderr={result.stderr.strip()!r}")
+        logger.debug("events stderr=%r", result.stderr.strip())
     if result.returncode != 0:
         raise RuntimeError(f"ical-guy events failed: {result.stderr.strip()}")
 

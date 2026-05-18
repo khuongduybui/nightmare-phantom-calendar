@@ -213,17 +213,16 @@ class TestSuggestMeetingTypeExceptions(unittest.TestCase):
     @patch("osaurus_client._load_config", return_value=OSAURUS_CONFIG)
     @patch("osaurus_client.OpenAI")
     def test_failure_writes_exactly_one_stderr_line(self, mock_openai_cls, _mock_cfg):
-        """AC2.6 — exactly one stderr line written on failure."""
+        """AC2.6 — exactly one log record emitted on failure."""
+
         mock_client = MagicMock()
         mock_client.chat.completions.create.side_effect = ConnectionError("refused")
         mock_openai_cls.return_value = mock_client
 
-        captured = StringIO()
-        with patch("sys.stderr", captured):
+        with self.assertLogs("osaurus_client", level="WARNING") as log_ctx:
             osaurus_client.suggest_meeting_type("Call", "", CATEGORIES)
 
-        lines = [ln for ln in captured.getvalue().splitlines() if ln.strip()]
-        self.assertEqual(len(lines), 1)
+        self.assertEqual(len(log_ctx.records), 1)
 
     @patch("osaurus_client._load_config", return_value=OSAURUS_CONFIG)
     @patch("osaurus_client.OpenAI")
@@ -275,14 +274,12 @@ class TestSuggestMeetingTypeYamlFailure(unittest.TestCase):
 
     @patch("osaurus_client._load_config", side_effect=FileNotFoundError("no file"))
     def test_yaml_failure_writes_stderr(self, _mock_cfg):
-        """AC2.6, AC2.7 — osaurus.yaml failure logs exactly one stderr line."""
-        captured = StringIO()
-        with patch("sys.stderr", captured):
+        """AC2.6, AC2.7 — osaurus.yaml failure logs exactly one warning record."""
+        with self.assertLogs("osaurus_client", level="WARNING") as log_ctx:
             osaurus_client.suggest_meeting_type("Call", "", CATEGORIES)
 
-        lines = [ln for ln in captured.getvalue().splitlines() if ln.strip()]
-        self.assertEqual(len(lines), 1)
-        self.assertIn("[osaurus_client] WARNING:", lines[0])
+        self.assertEqual(len(log_ctx.records), 1)
+        self.assertEqual(log_ctx.records[0].levelname, "WARNING")
 
 
 class TestNoLiveNetworkCalls(unittest.TestCase):

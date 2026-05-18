@@ -1,7 +1,10 @@
 """Calendar writer — writes alarm events to Google Calendar."""
 
+import logging
 import os
 from datetime import date, datetime, timedelta
+
+logger = logging.getLogger(__name__)
 
 import pytz
 
@@ -156,19 +159,21 @@ def run_calendar_write(
     existing = get_existing_alarm_for_tomorrow(service, calendar_id, timezone_str)
     for event in existing:
         delete_alarm_event(service, calendar_id, event["id"])
-        print(f"[calendar_writer] Deleted existing alarm: {event.get('summary', '(no title)')}")
+        logger.info("Deleted existing alarm: %s", event.get("summary", "(no title)"))
 
     # Write the new alarm event
     try:
         written = write_alarm_event(
             service, calendar_id, alarm_time, meeting_name, timezone_str, prep_minutes
         )
-        print(
-            f"[calendar_writer] Alarm written: {written.get('summary')} "
-            f"at {alarm_time.strftime('%H:%M')} ({prep_minutes} min)"
+        logger.info(
+            "Alarm written: %s at %s (%d min)",
+            written.get("summary"),
+            alarm_time.strftime("%H:%M"),
+            prep_minutes,
         )
     except Exception as exc:
-        print(f"[calendar_writer] ERROR: Failed to write alarm event — {exc}")
+        logger.error("Failed to write alarm event — %s", exc)
         raise
 
     # Override tomorrow's occurrence of the baseline recurring event if configured

@@ -111,8 +111,64 @@ Apply during Implementer, QA, Story-Review, and Feature-Review phases.
 **Owner:** Implementer, Story-Review
 
 ---
-## Rule: no-scheduler-in-npc-0000
 
-**When:** Reviewing NPC-0000 scope only.
-**Action:** `app.py` must not import or reference `scheduler.py`. Scheduler wiring belongs to a future feature.
-**Owner:** QA, Story-Review
+## Rule: logging-module-only
+
+**When:** Any code writes diagnostic, info, warning, or error output.
+**Action:** Use the `logging` module exclusively. No `print()` for diagnostics. No writing to `sys.stderr` directly. No ad-hoc helper functions (`_dbg`, `_log`, etc.).
+**Owner:** Implementer, QA, Story-Review
+
+---
+
+## Rule: module-level-logger
+
+**When:** Any production module (`*.py` under `phantom-calendar/`, excluding `tests/`) needs to emit log output.
+**Action:** Declare exactly one module-level logger at the top of the file, after imports:
+```python
+import logging
+logger = logging.getLogger(__name__)
+```
+Use `logger.*()` for all calls within that module. Never call `logging.debug(...)` / `logging.info(...)` etc. at the module level directly — always go through the named logger.
+**Owner:** Implementer
+
+---
+
+## Rule: logging-config-entry-points-only
+
+**When:** Any module needs to configure log output format, level, or handlers.
+**Action:** Call `logging.basicConfig()` only in `main.py` and `app.py` (the two entry points), via a shared `configure_logging()` helper defined in `main.py`. Library modules (`sync_job.py`, `compute.py`, `drive_config.py`, `calendar_writer.py`, `apple_calendar.py`, `osaurus_client.py`) must not call `basicConfig()`, add handlers, or set logger levels.
+**Owner:** Implementer, QA
+
+---
+
+## Rule: phantom-debug-env-var
+
+**When:** Any code needs verbose debug output gated on an environment variable.
+**Action:** Use `PHANTOM_DEBUG=1` as the single project-wide flag. The `configure_logging()` function in `main.py` reads this env var and sets the root logger to `DEBUG` level. Do not introduce per-module env flags (e.g. `PHANTOM_APPLE_DEBUG` is removed and must not be re-added).
+**Owner:** Implementer
+
+---
+
+## Rule: logging-levels
+
+**When:** Choosing a log level for any new log call.
+**Action:**
+- `logger.debug()` — verbose internals: probe results, event lists, computed values
+- `logger.info()` — normal flow milestones: config loaded, alarm written, scheduler started
+- `logger.warning()` — non-fatal anomalies: fallback activated, config mirror failed, classification write failed
+- `logger.error()` or `logger.exception()` — caught exceptions on error paths that surface to the user
+**Owner:** Implementer, QA
+
+---
+
+## Rule: test-logging-with-assertlogs
+
+**When:** Any test verifies that a warning or error is emitted by production code.
+**Action:** Use `self.assertLogs("<logger-name>", level="WARNING")` (or `ERROR`). Do **not** patch `sys.stderr` to capture log output — that no longer works after the `logging` migration. Use `log_ctx.records` for exact count checks and `log_ctx.output` for message content checks.
+
+Logger names follow `__name__`, so:
+- `main.py` → `"main"` (not `"__main__"` — it is imported as a module in tests)
+- `osaurus_client.py` → `"osaurus_client"`
+- `sync_job.py` → `"sync_job"`
+
+**Owner:** Implementer, QA

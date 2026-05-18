@@ -6,7 +6,7 @@ Always load these first. Universal policy — applies to all components.
 
 | File | Component | Description |
 |------|-----------|-------------|
-| [phantom-calendar](phantom-calendar.md) | phantom-calendar | Project-wide rules: test discovery, manual tests, README, credential gitignore, Python 3.14 compat, venv/uv conventions, icon design, no-tkinter-in-rumps, no-heredoc, local state gitignore |
+| [phantom-calendar](phantom-calendar.md) | phantom-calendar | Project-wide rules: test discovery, manual tests, README, credential gitignore, Python 3.14 compat, venv/uv conventions, icon design, no-tkinter-in-rumps, no-heredoc, local state gitignore, logging module conventions (module-level logger, entry-point-only basicConfig, PHANTOM_DEBUG env var, assertLogs in tests) |
 
 ## Components
 

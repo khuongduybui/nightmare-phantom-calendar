@@ -1,11 +1,14 @@
 """Phantom Calendar macOS menu bar application."""
 
 import json
+import logging
 import os
 import subprocess
 import sys
 import threading
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 import pytz
 import rumps
@@ -82,7 +85,7 @@ class PhantomCalendarApp(rumps.App):
             self._trigger_time = config.get("daily_run_time", "21:00")
             self._sync_time_item.title = f"Sync: {_hhmm_to_ampm(self._trigger_time)}"
         except Exception as exc:
-            print(f"[app] WARNING: Could not load config at startup — {exc}", file=sys.stderr)
+            logger.warning("Could not load config at startup — %s", exc)
 
         # Register as Login Item on first launch (non-fatal)
         self._register_login_item()
@@ -146,7 +149,7 @@ class PhantomCalendarApp(rumps.App):
             with open(STATE_FILE, "w") as f:
                 json.dump(state, f)
         except Exception as exc:
-            print(f"[app] WARNING: Could not save state — {exc}", file=sys.stderr)
+            logger.warning("Could not save state — %s", exc)
 
     def _load_state(self) -> None:
         """Restore sync state from .phantom_state.json (non-fatal if missing/corrupt)."""
@@ -156,7 +159,7 @@ class PhantomCalendarApp(rumps.App):
         except FileNotFoundError:
             return
         except Exception as exc:
-            print(f"[app] WARNING: Could not load state — {exc}", file=sys.stderr)
+            logger.warning("Could not load state — %s", exc)
             return
 
         try:
@@ -177,7 +180,7 @@ class PhantomCalendarApp(rumps.App):
             if self._last_sync_failed:
                 self._set_icon(self.ICON_ERROR)
         except Exception as exc:
-            print(f"[app] WARNING: Could not parse saved state — {exc}", file=sys.stderr)
+            logger.warning("Could not parse saved state — %s", exc)
 
     # ------------------------------------------------------------------
     # Menu actions
@@ -198,7 +201,7 @@ class PhantomCalendarApp(rumps.App):
                 try:
                     config = parse_config(read_config())
                 except Exception as exc:
-                    print(f"[app] WARNING: Could not load config for prefs — {exc}", file=sys.stderr)
+                    logger.warning("Could not load config for prefs — %s", exc)
                     config = {}
                 result = PreferencesWindow(config).show()
                 if result is not None:
@@ -241,9 +244,9 @@ class PhantomCalendarApp(rumps.App):
             write_config(yaml.dump(data, default_flow_style=False, allow_unicode=True))
             self._restart_scheduler(updated["timezone"], updated["daily_run_time"])
             self._sync_time_item.title = f"Sync: {_hhmm_to_ampm(updated['daily_run_time'])}"
-            print("[app] Preferences saved and scheduler restarted.")
+            logger.info("Preferences saved and scheduler restarted.")
         except Exception as exc:
-            print(f"[app] ERROR: Could not save preferences — {exc}", file=sys.stderr)
+            logger.error("Could not save preferences — %s", exc)
             try:
                 rumps.notification("Phantom Calendar", "", f"Could not save preferences: {exc}")
             except Exception:
@@ -259,7 +262,7 @@ class PhantomCalendarApp(rumps.App):
         self._timezone_str = timezone_str
         self._trigger_time = trigger_time
         self._scheduler = start_scheduler(timezone_str, trigger_time)
-        print(f"[app] Scheduler restarted: {trigger_time} {timezone_str}")
+        logger.info("Scheduler restarted: %s %s", trigger_time, timezone_str)
 
     @rumps.clicked("Run now")
     def run_now(self, _):
@@ -319,10 +322,9 @@ class PhantomCalendarApp(rumps.App):
                 timeout=5,
             )
             if result.returncode != 0:
-                print(
-                    f"[app] WARNING: Login Item registration failed — "
-                    f"{result.stderr.decode().strip()}",
-                    file=sys.stderr,
+                logger.warning(
+                    "Login Item registration failed — %s",
+                    result.stderr.decode().strip(),
                 )
         except Exception as exc:
-            print(f"[app] WARNING: Login Item registration failed — {exc}", file=sys.stderr)
+            logger.warning("Login Item registration failed — %s", exc)

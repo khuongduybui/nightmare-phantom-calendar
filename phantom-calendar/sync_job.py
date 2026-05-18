@@ -2,13 +2,16 @@
 
 import os
 import subprocess
-import sys
 import threading
 from datetime import date, datetime, timedelta
+
+import logging
 
 import rumps
 
 import apple_calendar
+
+logger = logging.getLogger(__name__)
 import osaurus_client
 from calendar_reader import get_msi_time_blocks, get_personal_events
 from calendar_writer import run_calendar_write
@@ -17,15 +20,6 @@ from drive_config import append_locations, append_recurring_meetings, parse_conf
 
 _SYNC_LOCK = threading.Lock()
 _PENDING_RUN = threading.Event()
-
-# Set PHANTOM_APPLE_DEBUG=1 to enable verbose debug logging across the sync pipeline.
-_DEBUG = os.environ.get("PHANTOM_APPLE_DEBUG", "") == "1"
-
-
-def _dbg(msg: str) -> None:
-    """Print a debug line to stderr when PHANTOM_APPLE_DEBUG=1."""
-    if _DEBUG:
-        print(f"[sync_job] {msg}", file=sys.stderr)
 
 
 def _ask_recurring_or_oneshot() -> bool:
@@ -74,7 +68,11 @@ def _classify_unknown_blocks(
         # Get AI suggestion (belt-and-suspenders: client already catches all exceptions)
         _osaurus_title = block.get("title", "Untitled")
         _osaurus_desc = block.get("description", "")
-        _dbg(f"osaurus query (MSI): title={_osaurus_title!r} description={_osaurus_desc[:80]!r}")
+        logger.debug(
+            "osaurus query (MSI): title=%r description=%r",
+            _osaurus_title,
+            _osaurus_desc[:80],
+        )
         try:
             suggestion = osaurus_client.suggest_meeting_type(
                 _osaurus_title,
@@ -82,9 +80,9 @@ def _classify_unknown_blocks(
                 [name for name, _ in options],
             )
         except Exception as _osa_exc:
-            _dbg(f"osaurus error (MSI): {_osa_exc}")
+            logger.debug("osaurus error (MSI): %s", _osa_exc)
             suggestion = None
-        _dbg(f"osaurus suggestion (MSI): {suggestion!r}")
+        logger.debug("osaurus suggestion (MSI): %r", suggestion)
 
         title_str = block.get("title", "").replace('"', "'") or "Untitled"
         default_item = suggestion if suggestion else "Skip (keep default)"
@@ -278,7 +276,9 @@ def _classify_personal_events(
             continue
 
         # Get AI suggestion
-        _dbg(f"osaurus query (personal): title={title!r} description={description[:80]!r}")
+        logger.debug(
+            "osaurus query (personal): title=%r description=%r", title, description[:80]
+        )
         try:
             suggestion = osaurus_client.suggest_meeting_type(
                 title,
@@ -286,9 +286,9 @@ def _classify_personal_events(
                 [name for name, _ in options],
             )
         except Exception as _osa_exc:
-            _dbg(f"osaurus error (personal): {_osa_exc}")
+            logger.debug("osaurus error (personal): %s", _osa_exc)
             suggestion = None
-        _dbg(f"osaurus suggestion (personal): {suggestion!r}")
+        logger.debug("osaurus suggestion (personal): %r", suggestion)
 
         default_item = suggestion if suggestion else "Skip (keep default)"
         safe_title = title.replace('"', "'")
@@ -444,7 +444,7 @@ def queue_run(app_ref=None, target_date=None) -> None:
     """
     if _SYNC_LOCK.locked():
         _PENDING_RUN.set()
-        print("[sync_job] Sync in progress — queued one pending run.", file=sys.stderr)
+        logger.info("Sync in progress — queued one pending run.")
     else:
         run_nightly_sync(app_ref, target_date=target_date)
 
@@ -477,13 +477,11 @@ def run_nightly_sync(app_ref=None, target_date=None) -> None:
     On any pipeline error: surfaces via rumps.notification + stderr, does not re-raise.
     """
     if not _SYNC_LOCK.acquire(blocking=False):
-        print("[sync_job] Sync already in progress — skipping.", file=sys.stderr)
+        logger.info("Sync already in progress — skipping.")
         return
 
-    debug = target_date is not None
-
-    if debug:
-        print(f"[DEBUG] === Phantom Calendar — debug/triage mode for {target_date} ===")
+    if target_date is not None:
+        logger.debug("=== Phantom Calendar — debug/triage mode for %s ===", target_date)
 
     if app_ref is not None:
         try:
@@ -499,12 +497,12 @@ def run_nightly_sync(app_ref=None, target_date=None) -> None:
         config = parse_config(raw)
 
         timezone_str = config.get("timezone", "America/New_York")
-        if debug:
-            print(f"[DEBUG] Timezone: {timezone_str}")
+        logger.debug("Timezone: %s", timezone_str)
 
         use_apple = apple_calendar.is_accessible()
-        if debug:
-            print(f"[DEBUG] Read source: {'Apple Calendar' if use_apple else 'Google Calendar'}")
+        logger.debug(
+            "Read source: %s", "Apple Calendar" if use_apple else "Google Calendar"
+        )
 
         if use_apple:
             try:
@@ -518,14 +516,21 @@ def run_nightly_sync(app_ref=None, target_date=None) -> None:
                 unified = [e for e in unified if "Alarm" not in e.get("title", "")]
                 msi_blocks = unified
                 personal_events = []
-                if debug:
-                    print(f"[DEBUG] Apple Calendar events fetched: {len(msi_blocks)}")
-                    for b in msi_blocks:
-                        loc = f" @ {b['location']}" if b.get("location") else ""
-                        print(f"[DEBUG]   {b['start'].strftime('%H:%M')} – {b['end'].strftime('%H:%M')} — {b['title']}{loc}")
+                logger.debug("Apple Calendar events fetched: %d", len(msi_blocks))
+                for b in msi_blocks:
+                    loc = f" @ {b['location']}" if b.get("location") else ""
+                    logger.debug(
+                        "  %s – %s — %s%s",
+                        b["start"].strftime("%H:%M"),
+                        b["end"].strftime("%H:%M"),
+                        b["title"],
+                        loc,
+                    )
             except Exception as exc:
                 _reason = str(exc)
-                print(f"[sync_job] Apple Calendar read failed, falling back to Google: {_reason}", file=sys.stderr)
+                logger.warning(
+                    "Apple Calendar read failed, falling back to Google: %s", _reason
+                )
                 try:
                     rumps.notification(
                         "Phantom Calendar", "",
@@ -536,46 +541,44 @@ def run_nightly_sync(app_ref=None, target_date=None) -> None:
                 use_apple = False
                 msi_blocks = get_msi_time_blocks(target_date=target_date)
                 personal_events = get_personal_events(target_date=target_date)
-                if debug:
-                    print(f"[DEBUG] Fallback: MSI blocks fetched: {len(msi_blocks)}")
+                logger.debug("Fallback: MSI blocks fetched: %d", len(msi_blocks))
         else:
             msi_blocks = get_msi_time_blocks(target_date=target_date)
-            if debug:
-                print(f"[DEBUG] MSI blocks fetched: {len(msi_blocks)}")
-                for b in msi_blocks:
-                    print(
-                        f"[DEBUG]   {b['start'].strftime('%H:%M')} – {b['end'].strftime('%H:%M')}"
-                    )
+            logger.debug("MSI blocks fetched: %d", len(msi_blocks))
+            for b in msi_blocks:
+                logger.debug(
+                    "  %s – %s",
+                    b["start"].strftime("%H:%M"),
+                    b["end"].strftime("%H:%M"),
+                )
 
             personal_events = get_personal_events(target_date=target_date)
-            if debug:
-                print(f"[DEBUG] Personal events fetched: {len(personal_events)}")
-                for e in personal_events:
-                    loc = f" @ {e['location']}" if e.get("location") else ""
-                    print(f"[DEBUG]   {e['start'].strftime('%H:%M')} — {e['title']}{loc}")
+            logger.debug("Personal events fetched: %d", len(personal_events))
+            for e in personal_events:
+                loc = f" @ {e['location']}" if e.get("location") else ""
+                logger.debug(
+                    "  %s — %s%s", e["start"].strftime("%H:%M"), e["title"], loc
+                )
 
-        result = compute_alarm(msi_blocks, personal_events, config, debug=debug)
+        result = compute_alarm(msi_blocks, personal_events, config)
         # Attach raw personal events so _show_popup can pass them to _classify_personal_events
         # (Apple path: personal_events=[] so this is a no-op; Google path: unchanged)
         result["personal_events"] = [
             e for e in personal_events if "Alarm" not in e.get("title", "")
         ]
         alarm_time = result.get("alarm_time")
-
-        if debug:
-            print("[DEBUG] --- Alarm result ---")
-            print(f"[DEBUG] First meeting : {result.get('first_meeting_name')}")
-            mt = result.get("first_meeting_time")
-            print(f"[DEBUG] Meeting time  : {mt.strftime('%H:%M') if mt else 'N/A'}")
-            print(f"[DEBUG] Prep minutes  : {result.get('prep_minutes')}")
-            at = result.get("alarm_time")
-            print(f"[DEBUG] Alarm time    : {at.strftime('%H:%M') if at else 'N/A'}")
-            print(f"[DEBUG] Is baseline   : {result.get('is_baseline')}")
-            print(
-                f"[DEBUG] All candidates: {[c['name'] for c in result.get('all_meetings', [])]}"
-            )
-            print(f"[DEBUG] Unknown blocks: {len(result.get('unknown_blocks', []))}")
-
+        mt = result.get("first_meeting_time")
+        at = result.get("alarm_time")
+        logger.debug("--- Alarm result ---")
+        logger.debug("First meeting : %s", result.get("first_meeting_name"))
+        logger.debug("Meeting time  : %s", mt.strftime("%H:%M") if mt else "N/A")
+        logger.debug("Prep minutes  : %s", result.get("prep_minutes"))
+        logger.debug("Alarm time    : %s", at.strftime("%H:%M") if at else "N/A")
+        logger.debug("Is baseline   : %s", result.get("is_baseline"))
+        logger.debug(
+            "All candidates: %s", [c["name"] for c in result.get("all_meetings", [])]
+        )
+        logger.debug("Unknown blocks: %d", len(result.get("unknown_blocks", [])))
         popup_response = _show_popup(result, config)
 
         run_calendar_write(
@@ -593,28 +596,28 @@ def run_nightly_sync(app_ref=None, target_date=None) -> None:
         if popup_response.get("classifications"):
             try:
                 append_recurring_meetings(popup_response["classifications"], config)
-                print(
-                    f"[sync_job] Wrote {len(popup_response['classifications'])} "
-                    "classification(s) to Drive config."
+                logger.info(
+                    "Wrote %d classification(s) to Drive config.",
+                    len(popup_response["classifications"]),
                 )
             except Exception as exc:
-                print(f"[sync_job] WARNING: Could not write classifications to Drive — {exc}", file=sys.stderr)
+                logger.warning("Could not write classifications to Drive — %s", exc)
 
         # Write new location → travel-minutes mappings to Drive config (non-fatal)
         if popup_response.get("location_travel_minutes"):
             try:
                 append_locations(popup_response["location_travel_minutes"], config)
-                print(
-                    f"[sync_job] Wrote {len(popup_response['location_travel_minutes'])} "
-                    "location(s) to Drive config."
+                logger.info(
+                    "Wrote %d location(s) to Drive config.",
+                    len(popup_response["location_travel_minutes"]),
                 )
             except Exception as exc:
-                print(f"[sync_job] WARNING: Could not write locations to Drive — {exc}", file=sys.stderr)
+                logger.warning("Could not write locations to Drive — %s", exc)
 
     except Exception as exc:
         failed = True
         msg = str(exc)
-        print(f"[sync_job] ERROR: {msg}", file=sys.stderr)
+        logger.error("ERROR: %s", msg)
         try:
             rumps.notification("Phantom Calendar", "", msg)
         except Exception:
