@@ -121,8 +121,6 @@ def get_tomorrow_events(
         "events",
         "--from",
         date_iso,
-        "--to",
-        date_iso,
         "--exclude-all-day",
         "--format",
         "json",
