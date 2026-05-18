@@ -31,6 +31,12 @@ Deferred items from MVP 2 feature definition.
 - PyInstaller packaging as .app bundle
 - Distribute via drag-to-Applications or DMG
 
+## Code Quality
+
+- **Migrate `sync_job.py` debug/error output from `print()` to the `logging` module** — global `python.instructions.md` rule prefers `logging` over `print`; the entire file uses `print` (pre-NPC-0004 pattern). A full-file migration is the correct scope; partial migration in a single story creates inconsistency. Deferred from NPC-0014 Feature-Review.
+
+---
+
 ## Future (MVP 3+)
 - Client-specific prep overrides: use `client_overrides` config (client name → prep minutes) to override default prep per client
 - Replace osascript popup with native SwiftUI notification

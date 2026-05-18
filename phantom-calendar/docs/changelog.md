@@ -15,9 +15,7 @@ Phantom Calendar is a macOS menu bar app that computes and writes a morning wake
 - Unknown work calendar blocks can be classified during the popup; the local osaurus AI pre-selects the most likely type so you can confirm in one click — save as Recurring (written to Drive config) or One-shot (this run only)
 - Personal calendar events are also offered for type classification via the same AI-assisted Recurring/One-shot flow
 - Personal calendar events at unknown locations prompt for travel time during the popup; new location → travel-minute mappings are saved back to the Drive config
-
-**What is in early design (feature.md only):**
-- NPC-0014 — Apple Calendar as a read-only event source via ical-guy (replaces Google Calendar reads on macOS when available; alarm writes always stay on Google Calendar)
+- On macOS with `ical-guy` installed and Calendar permission granted: all Apple Calendar events for tomorrow are read into a unified pool and used as the event source; alarm writes always go to Google Calendar; falls back silently to Google Calendar reads when ical-guy is unavailable
 
 ---
 
@@ -263,6 +261,24 @@ Adds a local AI assistant to pre-select the most likely meeting type when classi
 ---
 
 ## NPC-0014 — Apple Calendar as Event Source
-*Feature definition only — not yet planned*
+*Merged to main — Feature Review PASS (239/239 tests)*
 
-Replaces Google Calendar reads with Apple Calendar (via the local `ical-guy` CLI / EventKit) when available on macOS. All Apple Calendar events for tomorrow are treated as a single unified pool — no distinction between work and personal calendars. Alarm writes always go to Google Calendar regardless of read source. Falls back to Google Calendar reads when `ical-guy` is unavailable or Calendar permission is not granted.
+Adds Apple Calendar as a read-only event source on macOS, replacing Google Calendar for event querying when `ical-guy` is installed and Calendar permission is granted. All Apple Calendar events for tomorrow are treated as a single unified pool — no distinction between work and personal calendars. Alarm writes always go to Google Calendar. Falls back to Google Calendar reads silently when `ical-guy` is unavailable or Calendar permission is not granted.
+
+**Bug fix (pre-existing):** Recurring meeting classifications were silently discarded on baseline days (days where the alarm already matches the configured daily standup). Fixed by removing the `confirmed` gate on the classifications save — "Recurring" intent is now persisted regardless of whether a calendar write occurred.
+
+### US-1 — `apple_calendar.py`: Apple Calendar read module
+- New `apple_calendar.py` with `is_accessible()` and `get_tomorrow_events(target_date, exclude_calendars, timezone_str)`
+- `is_accessible()` checks: macOS platform, macOS ≥14, `ical-guy` binary found (probes known Homebrew paths as fallback for launchd/Finder launches where PATH is restricted), probe call exits zero with parseable JSON
+- `get_tomorrow_events()` calls `ical-guy events --from DATE --exclude-all-day --format json`, converts UTC datetimes to the configured local timezone, filters events not matching `target_date` in local time, and returns a sorted `list[dict]` in the canonical `{start, end, title, description, location}` shape
+- Optional `exclude_calendars` list forwarded as `--exclude-calendars` arg to `ical-guy`
+- `drive_config.parse_config()` extended with `apple_exclude_calendars` key (defaults to `[]`)
+
+### US-2 — `sync_job.py`: route reads through Apple Calendar when available
+- `run_nightly_sync()` calls `apple_calendar.is_accessible()` once after `parse_config()`; when True, reads all events via `get_tomorrow_events()` and passes the unified pool to `compute_alarm()` as `msi_blocks` with `personal_events=[]`
+- Events with "Alarm" in the title filtered from the Apple pool before compute (guards against Google Calendar alarms synced into Calendar.app)
+- On `get_tomorrow_events()` failure: `rumps.notification` fires with the specific reason and the run falls back to Google Calendar reads; fallback is transparent to the user
+- When `is_accessible()` returns False (ical-guy not installed, macOS < 14, permission denied): Google Calendar reads used silently — no notification, no behavior change
+- Alarm write path (`run_calendar_write()`) unchanged — always writes to Google Calendar
+- MT-14.1–MT-14.6 manual tests added to `build/manual_tests.md`
+- `README.md` updated: `apple_calendar.py` in Project Structure table; "Optional Dependencies" section documenting `ical-guy` install steps
