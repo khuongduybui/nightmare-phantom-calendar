@@ -33,8 +33,6 @@ Deferred items from MVP 2 feature definition.
 
 ## Code Quality
 
-- **Migrate `sync_job.py` debug/error output from `print()` to the `logging` module** — global `python.instructions.md` rule prefers `logging` over `print`; the entire file uses `print` (pre-NPC-0004 pattern). A full-file migration is the correct scope; partial migration in a single story creates inconsistency. Deferred from NPC-0014 Feature-Review.
-
 ---
 
 ## Future (MVP 3+)
