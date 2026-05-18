@@ -1,8 +1,4 @@
-#!/usr/bin/env bash
-# Run all Phantom Calendar unit tests.
-# Usage: bash build/tests.sh  (from phantom-calendar/ or anywhere inside the repo)
-
-set -euo pipefail
+#! /bin/bash
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
@@ -16,19 +12,9 @@ fi
 source "$VENV_DIR/bin/activate"
 cd "$PROJECT_DIR"
 
-echo "=== Phantom Calendar — Unit Tests ==="
+echo "=== Phantom Calendar — Development Environment ==="
 echo "Python: $(python --version)"
 echo "Venv:   $VENV_DIR"
 echo ""
 
-# Smoke imports
-echo "--- Smoke imports ---"
-python tests/smoke_imports.py
-
-# Unit tests
-echo ""
-echo "--- Unit tests ---"
-python -m pytest tests/ -v
-
-echo ""
-echo "All tests passed."
+nohup uv run main.py &
