@@ -1,21 +1,20 @@
 ---
-phase: Implementer
+phase: QA
 spec_hash: 'af1261cf8a16'
-status: NotStarted
-blockers: US-1
+status: Done
+blockers: None
 ---
 
 ## Last Run
-- N/A
+- ruff check sync_job.py tests/test_sync_job.py — PASS
+- python -m pytest tests/ — 239/239 PASS
 
 ## Changes Since Last Iteration
-- State files initialized
+- Added `import apple_calendar` and `from datetime import date` to `sync_job.py`
+- Modified `run_nightly_sync()`: updated docstring; added `use_apple = apple_calendar.is_accessible()` read source selection; branching read block calling `apple_calendar.get_tomorrow_events()` when accessible, filtering "Alarm" events from unified pool, falling back to Google reads with `rumps.notification` on RuntimeError
+- Added `TestRunNightlySyncAppleCalendarRouting` with 7 tests covering all AC2 paths
+- Added MT-14.1–MT-14.6 to `build/manual_tests.md`
+- Updated `README.md`: `apple_calendar.py` in Project Structure table + test listing; "Optional Dependencies" section for ical-guy
 
 ## Next Steps
-- After US-1 is merged: add `import apple_calendar` to `sync_job.py`
-- Replace the event-read block in `run_nightly_sync()` with the branching logic that selects Apple Calendar reads when `apple_calendar.is_accessible()` is true, falling back to Google reads on any `RuntimeError` with a `rumps.notification`
-- Filter out events with "Alarm" in title from the unified Apple pool before passing to `compute_alarm()`
-- Pass the unified Apple pool as `msi_blocks` and `[]` as `personal_events` to `compute_alarm()`
-- Extend `tests/test_sync_job.py` with the 6 routing test cases listed in spec
-- Add MT-14 entries (1–6) to `build/manual_tests.md`
-- Update `README.md`: list `apple_calendar.py` in Project Structure and `ical-guy` as optional runtime dependency
+- Story-Review loop

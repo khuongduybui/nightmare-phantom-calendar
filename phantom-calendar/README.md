@@ -124,6 +124,7 @@ phantom-calendar/
 ├── app.py                macOS menu bar app (rumps)
 ├── main.py               Entry point
 ├── drive_config.py       Google Drive config read/parse/bootstrap (YAML)
+├── apple_calendar.py     macOS Apple Calendar read source via ical-guy CLI (optional; falls back to Google Calendar reads if unavailable)
 ├── calendar_reader.py    Reads MSI time blocks and Personal calendar events (title, description included)
 ├── compute.py            Matches meetings and computes alarm time
 ├── osaurus_client.py     AI meeting-type suggestion via local osaurus server (openai-compatible)
@@ -146,6 +147,7 @@ phantom-calendar/
     ├── test_auth.py          Auth module unit tests
     ├── test_main.py          Entry point unit tests
     ├── test_drive_config.py  Drive config unit tests
+    ├── test_apple_calendar.py    Apple Calendar read module unit tests
     ├── test_calendar_reader.py  Calendar reader unit tests
     ├── test_compute.py       Compute module unit tests
     ├── test_calendar_writer.py  Calendar writer unit tests
@@ -155,6 +157,12 @@ phantom-calendar/
     ├── test_on_demand_sync.py  On-demand sync queue unit tests
     └── test_osaurus_client.py  osaurus AI suggestion client unit tests
 ```
+
+---
+
+## Optional Dependencies
+
+- **ical-guy** (`brew install itspriddle/brews/ical-guy`): enables reading tomorrow's events from Apple Calendar on macOS 14+. When installed and Calendar permission is granted, events are read from all Apple Calendars instead of Google Calendar. When absent, the system silently falls back to Google Calendar reads. Requires macOS 14 (Sonoma) or later.
 
 ---
 

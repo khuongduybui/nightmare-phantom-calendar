@@ -145,6 +145,198 @@ class TestRunNightlySync(unittest.TestCase):
         self.assertFalse(sync_job._SYNC_LOCK.locked())
 
 
+MOCK_CONFIG_WITH_APPLE = {**MOCK_CONFIG, "apple_exclude_calendars": []}
+
+APPLE_EVENTS = [
+    {
+        "start": MagicMock(),
+        "end": MagicMock(),
+        "title": "Team Sync",
+        "description": "",
+        "location": None,
+    }
+]
+
+
+class TestRunNightlySyncAppleCalendarRouting(unittest.TestCase):
+    """Tests for Apple Calendar read source selection (AC2.1–AC2.11)."""
+
+    def setUp(self):
+        import sync_job
+        if sync_job._SYNC_LOCK.locked():
+            sync_job._SYNC_LOCK.release()
+
+    @patch("sync_job.run_calendar_write")
+    @patch("sync_job._show_popup", return_value=MOCK_POPUP_RESPONSE)
+    @patch("sync_job.compute_alarm", return_value=MOCK_RESULT)
+    @patch("sync_job.get_personal_events", return_value=[])
+    @patch("sync_job.get_msi_time_blocks", return_value=[])
+    @patch("sync_job.apple_calendar.get_tomorrow_events", return_value=APPLE_EVENTS)
+    @patch("sync_job.apple_calendar.is_accessible", return_value=True)
+    @patch("sync_job.parse_config", return_value=MOCK_CONFIG_WITH_APPLE)
+    @patch("sync_job.read_config", return_value="yaml")
+    def test_apple_reads_used_when_accessible(
+        self,
+        mock_read, mock_parse, mock_accessible, mock_get_events,
+        mock_msi, mock_personal, mock_compute, mock_popup, mock_write,
+    ):
+        """AC2.1 — Apple reads selected when accessible; Google readers not called."""
+        import sync_job
+        sync_job.run_nightly_sync()
+
+        mock_accessible.assert_called_once()
+        mock_get_events.assert_called_once()
+        mock_msi.assert_not_called()
+        mock_personal.assert_not_called()
+
+    @patch("sync_job.run_calendar_write")
+    @patch("sync_job._show_popup", return_value=MOCK_POPUP_RESPONSE)
+    @patch("sync_job.compute_alarm", return_value=MOCK_RESULT)
+    @patch("sync_job.get_personal_events", return_value=[])
+    @patch("sync_job.get_msi_time_blocks", return_value=[])
+    @patch("sync_job.apple_calendar.get_tomorrow_events", return_value=APPLE_EVENTS)
+    @patch("sync_job.apple_calendar.is_accessible", return_value=True)
+    @patch("sync_job.parse_config", return_value=MOCK_CONFIG_WITH_APPLE)
+    @patch("sync_job.read_config", return_value="yaml")
+    def test_apple_reads_passed_as_msi_blocks(
+        self,
+        mock_read, mock_parse, mock_accessible, mock_get_events,
+        mock_msi, mock_personal, mock_compute, mock_popup, mock_write,
+    ):
+        """AC2.6 — Unified pool passed as msi_blocks with personal_events=[]."""
+        import sync_job
+        sync_job.run_nightly_sync()
+
+        call_args = mock_compute.call_args
+        msi_arg = call_args[0][0]
+        personal_arg = call_args[0][1]
+        self.assertEqual(msi_arg, APPLE_EVENTS)
+        self.assertEqual(personal_arg, [])
+
+    @patch("sync_job.run_calendar_write")
+    @patch("sync_job._show_popup", return_value=MOCK_POPUP_RESPONSE)
+    @patch("sync_job.compute_alarm", return_value=MOCK_RESULT)
+    @patch("sync_job.get_personal_events", return_value=[])
+    @patch("sync_job.get_msi_time_blocks", return_value=[])
+    @patch("sync_job.apple_calendar.is_accessible", return_value=False)
+    @patch("sync_job.parse_config", return_value=MOCK_CONFIG_WITH_APPLE)
+    @patch("sync_job.read_config", return_value="yaml")
+    def test_google_reads_when_not_accessible_silent(
+        self,
+        mock_read, mock_parse, mock_accessible,
+        mock_msi, mock_personal, mock_compute, mock_popup, mock_write,
+    ):
+        """AC2.2/AC2.3 — Google reads silently when ical-guy inaccessible; no notification."""
+        import sync_job
+        with patch("sync_job.rumps") as mock_rumps:
+            sync_job.run_nightly_sync()
+
+        mock_msi.assert_called_once()
+        mock_personal.assert_called_once()
+        mock_rumps.notification.assert_not_called()
+
+    @patch("sync_job.rumps")
+    @patch("sync_job.run_calendar_write")
+    @patch("sync_job._show_popup", return_value=MOCK_POPUP_RESPONSE)
+    @patch("sync_job.compute_alarm", return_value=MOCK_RESULT)
+    @patch("sync_job.get_personal_events", return_value=[])
+    @patch("sync_job.get_msi_time_blocks", return_value=[])
+    @patch("sync_job.apple_calendar.get_tomorrow_events", side_effect=RuntimeError("ical-guy crashed"))
+    @patch("sync_job.apple_calendar.is_accessible", return_value=True)
+    @patch("sync_job.parse_config", return_value=MOCK_CONFIG_WITH_APPLE)
+    @patch("sync_job.read_config", return_value="yaml")
+    def test_apple_runtime_failure_falls_back_with_notification(
+        self,
+        mock_read, mock_parse, mock_accessible, mock_get_events,
+        mock_msi, mock_personal, mock_compute, mock_popup, mock_write, mock_rumps,
+    ):
+        """AC2.4 — RuntimeError from get_tomorrow_events fires notification + Google fallback."""
+        import sync_job
+        sync_job.run_nightly_sync()
+
+        mock_rumps.notification.assert_called_once()
+        msg = mock_rumps.notification.call_args[0][2]
+        self.assertIn("ical-guy crashed", msg)
+        self.assertIn("Google Calendar", msg)
+        mock_msi.assert_called_once()
+        mock_personal.assert_called_once()
+
+    @patch("sync_job.run_calendar_write")
+    @patch("sync_job._show_popup", return_value=MOCK_POPUP_RESPONSE)
+    @patch("sync_job.compute_alarm", return_value=MOCK_RESULT)
+    @patch("sync_job.get_personal_events", return_value=[])
+    @patch("sync_job.get_msi_time_blocks", return_value=[])
+    @patch(
+        "sync_job.apple_calendar.get_tomorrow_events",
+        return_value=[
+            {"start": MagicMock(), "end": MagicMock(), "title": "⏰ Alarm — Standup", "description": "", "location": None},
+            {"start": MagicMock(), "end": MagicMock(), "title": "Team Sync", "description": "", "location": None},
+        ],
+    )
+    @patch("sync_job.apple_calendar.is_accessible", return_value=True)
+    @patch("sync_job.parse_config", return_value=MOCK_CONFIG_WITH_APPLE)
+    @patch("sync_job.read_config", return_value="yaml")
+    def test_alarm_events_filtered_from_apple_pool(
+        self,
+        mock_read, mock_parse, mock_accessible, mock_get_events,
+        mock_msi, mock_personal, mock_compute, mock_popup, mock_write,
+    ):
+        """AC2.5 — Events with 'Alarm' in title filtered out before compute."""
+        import sync_job
+        sync_job.run_nightly_sync()
+
+        msi_arg = mock_compute.call_args[0][0]
+        titles = [e["title"] for e in msi_arg]
+        self.assertNotIn("⏰ Alarm — Standup", titles)
+        self.assertIn("Team Sync", titles)
+
+    @patch("sync_job.run_calendar_write")
+    @patch("sync_job._show_popup", return_value=MOCK_POPUP_RESPONSE)
+    @patch("sync_job.compute_alarm", return_value=MOCK_RESULT)
+    @patch("sync_job.get_personal_events", return_value=[])
+    @patch("sync_job.get_msi_time_blocks", return_value=[])
+    @patch("sync_job.apple_calendar.get_tomorrow_events", return_value=APPLE_EVENTS)
+    @patch("sync_job.apple_calendar.is_accessible", return_value=True)
+    @patch("sync_job.parse_config", return_value={**MOCK_CONFIG, "apple_exclude_calendars": ["US Holidays"]})
+    @patch("sync_job.read_config", return_value="yaml")
+    def test_apple_exclude_calendars_forwarded_to_get_tomorrow_events(
+        self,
+        mock_read, mock_parse, mock_accessible, mock_get_events,
+        mock_msi, mock_personal, mock_compute, mock_popup, mock_write,
+    ):
+        """AC2.1 — apple_exclude_calendars from config forwarded to get_tomorrow_events."""
+        import sync_job
+        sync_job.run_nightly_sync()
+
+        _, kwargs = mock_get_events.call_args
+        self.assertEqual(kwargs.get("exclude_calendars") or mock_get_events.call_args[0][1], ["US Holidays"])
+
+    @patch("sync_job.run_calendar_write")
+    @patch("sync_job._show_popup", return_value=MOCK_POPUP_RESPONSE)
+    @patch("sync_job.compute_alarm", return_value=MOCK_RESULT)
+    @patch("sync_job.get_personal_events", return_value=[])
+    @patch("sync_job.get_msi_time_blocks", return_value=[])
+    @patch("sync_job.apple_calendar.get_tomorrow_events", return_value=APPLE_EVENTS)
+    @patch("sync_job.apple_calendar.is_accessible", return_value=True)
+    @patch("sync_job.parse_config", return_value=MOCK_CONFIG_WITH_APPLE)
+    @patch("sync_job.read_config", return_value="yaml")
+    def test_run_calendar_write_called_same_in_apple_path(
+        self,
+        mock_read, mock_parse, mock_accessible, mock_get_events,
+        mock_msi, mock_personal, mock_compute, mock_popup, mock_write,
+    ):
+        """AC2.7 — run_calendar_write called identically regardless of read source."""
+        import sync_job
+        sync_job.run_nightly_sync()
+
+        mock_write.assert_called_once_with(
+            MOCK_POPUP_RESPONSE,
+            MOCK_CONFIG_WITH_APPLE,
+            meeting_name=MOCK_RESULT["first_meeting_name"],
+            prep_minutes=MOCK_RESULT["prep_minutes"],
+        )
+
+
 class TestPromptUnknownLocations(unittest.TestCase):
     """Tests for _prompt_unknown_locations (AC 2.4–2.11)."""
 
