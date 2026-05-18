@@ -585,8 +585,12 @@ def run_nightly_sync(app_ref=None, target_date=None) -> None:
             prep_minutes=result["prep_minutes"],
         )
 
-        # Write classifications back to Drive config (non-fatal)
-        if popup_response.get("confirmed") and popup_response.get("classifications"):
+        # Write classifications back to Drive config (non-fatal).
+        # Saved regardless of whether the alarm was confirmed — the user explicitly
+        # chose "Recurring", so the intent to remember the meeting type should not be
+        # gated on the alarm write (e.g. baseline days return confirmed=False even
+        # though the classification dialog ran and the user answered).
+        if popup_response.get("classifications"):
             try:
                 append_recurring_meetings(popup_response["classifications"], config)
                 print(
