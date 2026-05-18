@@ -1,12 +1,13 @@
 ---
-phase: Planner
+phase: Feature-Review
 spec_hash: '0e766ccb6247'
-status: SpecDraft
+status: Done
+blockers: None
 ---
 
 ## Last Run
-- 2026-05-13: Planner produced spec.md. Awaiting human approval.
+- Feature Review Decision: PASS
 
 ## Stories
-- US-1: preferences.py — NotStarted
-- US-2: app.py + scheduler.py wiring — NotStarted
+- US-1: preferences.py — Done
+- US-2: app.py + scheduler.py wiring — Done

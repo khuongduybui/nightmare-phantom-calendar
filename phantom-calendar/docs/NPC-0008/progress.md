@@ -1,11 +1,12 @@
 ---
-phase: Planner
+phase: Feature-Review
 spec_hash: 'ad248d298459'
-status: SpecDraft
+status: Done
+blockers: None
 ---
 
 ## Last Run
-- 2026-05-12: Planner produced spec.md. Awaiting human approval.
+- Feature Review Decision: PASS
 
 ## Stories
-- US-1: State persistence — NotStarted
+- US-1: State persistence — Done

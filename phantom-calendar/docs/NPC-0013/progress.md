@@ -1,20 +1,14 @@
 ---
-phase: Planner
+phase: Feature-Review
 spec_hash: 'ba1561a5443c'
-status: InProgress
+status: Done
 blockers: None
 ---
 
 ## Last Run
-- Created spec.md, decision.md, per-story state files for NPC-0013.
+- Feature Review Decision: PASS
 
-## Changes Since Last Iteration
-- Initial spec draft for NPC-0013 (AI-assisted meeting classification via osaurus).
-- 3 user stories: US-1 (calendar reader plumbing), US-2 (osaurus_client module), US-3 (sync_job wiring + personal-event classification + Recurring/One-shot dialog).
-- Parallel-safe pair identified: {US-1, US-2}. US-3 depends on both.
-
-## Next Steps
-- Await human approval of spec.md.
-- After approval, run the `approve-spec` skill to seal the spec hash.
-- (Optional) Run `Plan-Review` for cross-model planning QA.
-- Then schedule US-1 and US-2 in parallel; US-3 after both merge.
+## Stories
+- US-1: Extend calendar readers with title and description — Done
+- US-2: osaurus_client module — Done
+- US-3: Wire suggestion + Recurring/One-shot dialogs into sync popup — Done

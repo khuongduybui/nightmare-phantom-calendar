@@ -1,12 +1,13 @@
 ---
-phase: Planner
+phase: Feature-Review
 spec_hash: 'ba25c3ccc293'
-status: SpecDraft
+status: Done
+blockers: None
 ---
 
 ## Last Run
-- 2026-05-12: Planner produced spec.md. Awaiting human approval.
+- Feature Review Decision: PASS
 
 ## Stories
-- US-1: Wire icons into app.py — NotStarted
-- Human: H-1 through H-3 (icon generation) — NotStarted
+- US-1: Wire icons into app.py — Done
+- Human: H-1 through H-3 (icon generation) — Done
