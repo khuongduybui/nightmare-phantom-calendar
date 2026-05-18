@@ -8,6 +8,8 @@ import subprocess
 import sys
 from datetime import date, datetime
 
+import pytz
+
 # Set PHANTOM_APPLE_DEBUG=1 in the environment to enable verbose ical-guy logging.
 _DEBUG = os.environ.get("PHANTOM_APPLE_DEBUG", "") == "1"
 
@@ -100,8 +102,13 @@ def is_accessible() -> bool:
 def get_tomorrow_events(
     target_date: date,
     exclude_calendars: list[str] | None = None,
+    timezone_str: str = "America/New_York",
 ) -> list[dict]:
     """Return tomorrow's events from all Apple Calendars as a unified list.
+
+    ical-guy returns times in UTC. This function converts them to the given
+    timezone before returning, so callers receive local-time datetimes
+    consistent with the rest of the pipeline.
 
     Each dict has keys: start (datetime), end (datetime), title (str),
     description (str), location (str | None).
@@ -163,6 +170,17 @@ def get_tomorrow_events(
                 f"ical-guy returned invalid startDate {start_str!r}: {exc}"
             ) from exc
 
+        # Convert UTC to configured local timezone.
+        # ical-guy returns ISO 8601 with UTC offset (e.g. 2026-05-19T14:00:00+00:00).
+        # datetime.fromisoformat() produces a tz-aware UTC datetime; convert to local.
+        local_tz = pytz.timezone(timezone_str)
+        if start_dt.tzinfo is not None:
+            start_dt = start_dt.astimezone(local_tz)
+        else:
+            # Naive datetime — assume UTC, localise.
+            start_dt = pytz.utc.localize(start_dt).astimezone(local_tz)
+
+        # Date-filter in local time (a UTC event near midnight may land on a different day).
         if start_dt.date() != target_date:
             continue
 
@@ -171,6 +189,12 @@ def get_tomorrow_events(
             end_dt = datetime.fromisoformat(end_str) if end_str else start_dt
         except (ValueError, TypeError):
             end_dt = start_dt
+
+        if end_dt is not start_dt:  # only convert if not already the fallback
+            if end_dt.tzinfo is not None:
+                end_dt = end_dt.astimezone(local_tz)
+            else:
+                end_dt = pytz.utc.localize(end_dt).astimezone(local_tz)
 
         events.append(
             {

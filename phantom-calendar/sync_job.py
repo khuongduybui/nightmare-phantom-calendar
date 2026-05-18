@@ -512,6 +512,7 @@ def run_nightly_sync(app_ref=None, target_date=None) -> None:
                 unified = apple_calendar.get_tomorrow_events(
                     _target,
                     config.get("apple_exclude_calendars", []),
+                    timezone_str,
                 )
                 # Filter out alarm events that may have synced from Google into Calendar.app
                 unified = [e for e in unified if "Alarm" not in e.get("title", "")]
