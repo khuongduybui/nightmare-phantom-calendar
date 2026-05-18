@@ -71,12 +71,13 @@ def _classify_unknown_blocks(
         except Exception:
             suggestion = None
 
+        title_str = block.get("title", "").replace('"', "'") or "Untitled"
         default_item = suggestion if suggestion else "Skip (keep default)"
         items_str = ", ".join(f'"{n}"' for n in option_names)
         script = (
             f'tell application "System Events" to set sel to '
             f"choose from list {{{items_str}}} "
-            f'with prompt "Unknown block at {start_str} — what type of meeting is this?" '
+            f'with prompt "{title_str} at {start_str} — what type of meeting is this?" '
             f'default items {{"{default_item}"}} '
             f'with title "Phantom Calendar"\n'
             f"if sel is false then\n"
