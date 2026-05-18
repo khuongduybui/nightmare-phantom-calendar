@@ -2,9 +2,7 @@
 
 import os
 import unittest
-from unittest.mock import MagicMock, call, patch
-
-import yaml
+from unittest.mock import patch
 
 VALID_YAML = """
 calendars:
@@ -112,7 +110,7 @@ class TestParseConfig(unittest.TestCase):
 
     def test_parse_config_all_defaults_on_empty_input(self):
         result = drive_config.parse_config("")
-        self.assertEqual(len(result), 12)
+        self.assertEqual(len(result), 13)
         self.assertEqual(result["personal_calendar_id"], "duykbui1989@gmail.com")
         self.assertEqual(result["msi_calendar_id"], "duy.bui@motorolasolutions.com")
         self.assertEqual(result["daily_run_time"], "19:00")
@@ -125,6 +123,7 @@ class TestParseConfig(unittest.TestCase):
         self.assertEqual(result["meeting_type_prep"], {})
         self.assertEqual(result["locations"], {"Home": 0})  # Home:0 always injected
         self.assertEqual(result["client_overrides"], {})
+        self.assertEqual(result["apple_exclude_calendars"], [])
 
     def test_parse_config_overrides_calendar_ids(self):
         result = drive_config.parse_config(VALID_YAML)
@@ -151,6 +150,37 @@ class TestParseConfig(unittest.TestCase):
         result = drive_config.parse_config(VALID_YAML)
         self.assertEqual(result["locations"]["Office"], 30)
         self.assertEqual(result["client_overrides"]["Acme Corp"], 45)
+
+    def test_parse_config_apple_exclude_calendars_present(self):
+        yaml_str = """
+calendars:
+  personal_id: test@example.com
+  apple_exclude_calendars:
+    - "US Holidays"
+    - "Birthdays"
+"""
+        result = drive_config.parse_config(yaml_str)
+        self.assertEqual(result["apple_exclude_calendars"], ["US Holidays", "Birthdays"])
+
+    def test_parse_config_apple_exclude_calendars_missing(self):
+        result = drive_config.parse_config(VALID_YAML)
+        self.assertEqual(result["apple_exclude_calendars"], [])
+
+    def test_parse_config_apple_exclude_calendars_non_list_ignored(self):
+        yaml_str = """
+calendars:
+  apple_exclude_calendars: "not a list"
+"""
+        result = drive_config.parse_config(yaml_str)
+        self.assertEqual(result["apple_exclude_calendars"], [])
+
+    def test_parse_config_apple_exclude_calendars_empty_list(self):
+        yaml_str = """
+calendars:
+  apple_exclude_calendars: []
+"""
+        result = drive_config.parse_config(yaml_str)
+        self.assertEqual(result["apple_exclude_calendars"], [])
 
     @patch.dict(os.environ, {"PHANTOM_CONFIG_FILE_ID": "custom-file-id"})
     def test_config_file_id_uses_env_var(self):

@@ -1,18 +1,20 @@
 ---
-phase: Implementer
+phase: QA
 spec_hash: 'af1261cf8a16'
-status: NotStarted
+status: Done
 blockers: None
 ---
 
 ## Last Run
-- N/A
+- ruff check — PASS
+- python -m pytest tests/ — 232/232 PASS
 
 ## Changes Since Last Iteration
-- State files initialized
+- Created `apple_calendar.py` with `is_accessible()` and `get_tomorrow_events()` — all AC1.1–AC1.17 implemented
+- Extended `drive_config.parse_config()` with `apple_exclude_calendars` key (AC1.15–AC1.16)
+- Created `tests/test_apple_calendar.py` with 22 tests covering all branches
+- Extended `tests/test_drive_config.py` with 4 apple_exclude_calendars tests
+- QA rework: renamed loop var ev→event; added apple_exclude_calendars to _DEFAULTS; guarded datetime.fromisoformat with RuntimeError; added 2 tests for endDate fallback and malformed startDate
 
 ## Next Steps
-- Implement `apple_calendar.py`: `is_accessible()` (macOS/version/PATH/probe checks) and `get_tomorrow_events(target_date, exclude_calendars)` returning canonical event dicts from all Apple Calendars via ical-guy
-- Extend `drive_config.parse_config()` with `apple_exclude_calendars` key (defaults to `[]`)
-- Write `tests/test_apple_calendar.py` (mock `subprocess.run`, `shutil.which`, `platform.system`, `platform.mac_ver`)
-- Extend `tests/test_drive_config.py` with `apple_exclude_calendars` parsing tests
+- Story-Review loop
