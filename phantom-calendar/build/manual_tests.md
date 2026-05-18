@@ -199,7 +199,112 @@ Complete all prerequisites before running each section.
 
 ---
 
-## Adding New Manual Tests
+## NPC-0014 — Apple Calendar Integration (Read Source)
+
+### MT-14.1 — Apple Calendar events appear in sync popup
+
+**Feature:** NPC-0014
+
+**Prerequisites:**
+- ical-guy installed: `brew install itspriddle/brews/ical-guy`
+- macOS 14 (Sonoma) or later
+- Calendar permission granted (run `ical-guy calendars` once to trigger the prompt)
+- At least one timed event scheduled in any Apple Calendar for tomorrow
+
+**Steps:**
+1. Run the app and trigger a sync (via "Run now" or wait for the scheduled run).
+2. Observe the confirmation popup.
+
+**Pass criteria:**
+The popup lists event(s) from Apple Calendar for tomorrow, and the alarm time reflects those events. `[sync_job] Read source: Apple Calendar` appears in stderr (run in debug/triage mode to verify).
+
+---
+
+### MT-14.2 — Silent fallback to Google when ical-guy not installed
+
+**Feature:** NPC-0014
+
+**Prerequisites:**
+- ical-guy uninstalled: `brew uninstall itspriddle/brews/ical-guy` (or never installed)
+
+**Steps:**
+1. Run the app and trigger a sync.
+2. Observe the confirmation popup and check for notifications.
+
+**Pass criteria:**
+No "Apple Calendar" notification appears. The popup shows events from Google Calendar. Behavior is identical to pre-NPC-0014.
+
+---
+
+### MT-14.3 — Silent fallback when Calendar permission revoked
+
+**Feature:** NPC-0014
+
+**Prerequisites:**
+- ical-guy installed
+- macOS Calendar permission revoked: System Settings → Privacy & Security → Calendars → disable for Terminal / app process
+
+**Steps:**
+1. Run a sync.
+2. Check for notifications.
+
+**Pass criteria:**
+No notification appears. Sync completes using Google Calendar reads silently.
+
+---
+
+### MT-14.4 — Excluded calendar events not shown in popup
+
+**Feature:** NPC-0014
+
+**Prerequisites:**
+- ical-guy installed and Calendar permission granted
+- A timed event exists in a calendar named "US Holidays" (or any calendar you choose to exclude) for tomorrow
+- `apple_exclude_calendars: ["US Holidays"]` set in config.yaml or Drive config
+
+**Steps:**
+1. Run a sync.
+2. Observe the popup event list.
+
+**Pass criteria:**
+Events from "US Holidays" do not appear in the popup event list.
+
+---
+
+### MT-14.5 — Notification fires on Apple Calendar runtime failure
+
+**Feature:** NPC-0014
+
+**Prerequisites:**
+- ical-guy installed and Calendar permission granted
+
+**Steps:**
+1. Rename the `ical-guy` binary while a sync is starting (race condition test — or mock by temporarily replacing the binary with a script that exits non-zero after is_accessible has returned True).
+2. Trigger a sync.
+3. Observe the macOS notification area.
+
+**Pass criteria:**
+A notification appears with a message containing "Apple Calendar read failed" and "using Google Calendar". The sync completes successfully using Google Calendar reads.
+
+---
+
+### MT-14.6 — Google alarm events not included from Apple Calendar
+
+**Feature:** NPC-0014
+
+**Prerequisites:**
+- ical-guy installed and Calendar permission granted
+- Google Calendar is synced into Calendar.app (so alarm events written by Phantom Calendar appear there)
+- A prior sync has already written an alarm event to Google Calendar (which is visible in Calendar.app)
+
+**Steps:**
+1. Run a sync.
+2. Observe the popup event list.
+
+**Pass criteria:**
+The alarm event (e.g., "⏰ Alarm — ...") from a prior sync does not appear in the popup event list when Apple Calendar reads are active.
+
+---
 
 When a new feature introduces manual ACs:
 1. Add a new `## Feature-Name` section above.

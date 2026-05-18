@@ -43,4 +43,17 @@ recurring_meetings:
   notes: Alarm at 12:15 if first meeting of day
   prep_minutes: 15
   start: '12:30'
+- days:
+  - Mon
+  - Tue
+  - Wed
+  - Thu
+  - Fri
+  end: '14:35'
+  location: Home
+  meeting_type: Daily standup
+  name: Daily standup (14:30)
+  notes: Auto-classified by Phantom Calendar
+  prep_minutes: 5
+  start: '14:30'
 timezone: America/New_York

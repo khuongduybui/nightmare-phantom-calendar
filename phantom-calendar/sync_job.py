@@ -1,12 +1,14 @@
 """Nightly sync pipeline — orchestrates the full alarm computation and write flow."""
 
+import os
 import subprocess
 import sys
 import threading
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import rumps
 
+import apple_calendar
 import osaurus_client
 from calendar_reader import get_msi_time_blocks, get_personal_events
 from calendar_writer import run_calendar_write
@@ -15,6 +17,15 @@ from drive_config import append_locations, append_recurring_meetings, parse_conf
 
 _SYNC_LOCK = threading.Lock()
 _PENDING_RUN = threading.Event()
+
+# Set PHANTOM_APPLE_DEBUG=1 to enable verbose debug logging across the sync pipeline.
+_DEBUG = os.environ.get("PHANTOM_APPLE_DEBUG", "") == "1"
+
+
+def _dbg(msg: str) -> None:
+    """Print a debug line to stderr when PHANTOM_APPLE_DEBUG=1."""
+    if _DEBUG:
+        print(f"[sync_job] {msg}", file=sys.stderr)
 
 
 def _ask_recurring_or_oneshot() -> bool:
@@ -61,21 +72,27 @@ def _classify_unknown_blocks(
         start_str = block["start"].strftime("%H:%M")
 
         # Get AI suggestion (belt-and-suspenders: client already catches all exceptions)
+        _osaurus_title = block.get("title", "Untitled")
+        _osaurus_desc = block.get("description", "")
+        _dbg(f"osaurus query (MSI): title={_osaurus_title!r} description={_osaurus_desc[:80]!r}")
         try:
             suggestion = osaurus_client.suggest_meeting_type(
-                block.get("title", "Untitled"),
-                block.get("description", ""),
+                _osaurus_title,
+                _osaurus_desc,
                 [name for name, _ in options],
             )
-        except Exception:
+        except Exception as _osa_exc:
+            _dbg(f"osaurus error (MSI): {_osa_exc}")
             suggestion = None
+        _dbg(f"osaurus suggestion (MSI): {suggestion!r}")
 
+        title_str = block.get("title", "").replace('"', "'") or "Untitled"
         default_item = suggestion if suggestion else "Skip (keep default)"
         items_str = ", ".join(f'"{n}"' for n in option_names)
         script = (
             f'tell application "System Events" to set sel to '
             f"choose from list {{{items_str}}} "
-            f'with prompt "Unknown block at {start_str} — what type of meeting is this?" '
+            f'with prompt "{title_str} at {start_str} — what type of meeting is this?" '
             f'default items {{"{default_item}"}} '
             f'with title "Phantom Calendar"\n'
             f"if sel is false then\n"
@@ -261,14 +278,17 @@ def _classify_personal_events(
             continue
 
         # Get AI suggestion
+        _dbg(f"osaurus query (personal): title={title!r} description={description[:80]!r}")
         try:
             suggestion = osaurus_client.suggest_meeting_type(
                 title,
                 description,
                 [name for name, _ in options],
             )
-        except Exception:
+        except Exception as _osa_exc:
+            _dbg(f"osaurus error (personal): {_osa_exc}")
             suggestion = None
+        _dbg(f"osaurus suggestion (personal): {suggestion!r}")
 
         default_item = suggestion if suggestion else "Skip (keep default)"
         safe_title = title.replace('"', "'")
@@ -438,8 +458,18 @@ def run_nightly_sync(app_ref=None, target_date=None) -> None:
             update the menu bar icon and status items.
 
     Execution order:
-        read_config → parse_config → get_msi_time_blocks → get_personal_events
+        read_config → parse_config → [Apple Calendar reads | Google Calendar reads]
         → compute_alarm → ConfirmationPopup.show() → run_calendar_write()
+
+    Read source selection (per-run, automatic):
+        If apple_calendar.is_accessible() returns True, events are read from all
+        Apple Calendars via ical-guy and merged into a unified pool (passed as
+        msi_blocks to compute_alarm with personal_events=[]). On any failure,
+        falls back to Google Calendar reads with a rumps.notification.
+        If apple_calendar.is_accessible() returns False, Google Calendar reads
+        are used silently (pre-NPC-0014 behavior).
+
+    The alarm write path (run_calendar_write) always targets Google Calendar.
 
     Protected by a module-level lock — returns immediately without running
     if a sync is already in progress (prevents double-trigger).
@@ -472,23 +502,61 @@ def run_nightly_sync(app_ref=None, target_date=None) -> None:
         if debug:
             print(f"[DEBUG] Timezone: {timezone_str}")
 
-        msi_blocks = get_msi_time_blocks(target_date=target_date)
+        use_apple = apple_calendar.is_accessible()
         if debug:
-            print(f"[DEBUG] MSI blocks fetched: {len(msi_blocks)}")
-            for b in msi_blocks:
-                print(
-                    f"[DEBUG]   {b['start'].strftime('%H:%M')} – {b['end'].strftime('%H:%M')}"
-                )
+            print(f"[DEBUG] Read source: {'Apple Calendar' if use_apple else 'Google Calendar'}")
 
-        personal_events = get_personal_events(target_date=target_date)
-        if debug:
-            print(f"[DEBUG] Personal events fetched: {len(personal_events)}")
-            for e in personal_events:
-                loc = f" @ {e['location']}" if e.get("location") else ""
-                print(f"[DEBUG]   {e['start'].strftime('%H:%M')} — {e['title']}{loc}")
+        if use_apple:
+            try:
+                _target = target_date if target_date is not None else date.today() + timedelta(days=1)
+                unified = apple_calendar.get_tomorrow_events(
+                    _target,
+                    config.get("apple_exclude_calendars", []),
+                    timezone_str,
+                )
+                # Filter out alarm events that may have synced from Google into Calendar.app
+                unified = [e for e in unified if "Alarm" not in e.get("title", "")]
+                msi_blocks = unified
+                personal_events = []
+                if debug:
+                    print(f"[DEBUG] Apple Calendar events fetched: {len(msi_blocks)}")
+                    for b in msi_blocks:
+                        loc = f" @ {b['location']}" if b.get("location") else ""
+                        print(f"[DEBUG]   {b['start'].strftime('%H:%M')} – {b['end'].strftime('%H:%M')} — {b['title']}{loc}")
+            except Exception as exc:
+                _reason = str(exc)
+                print(f"[sync_job] Apple Calendar read failed, falling back to Google: {_reason}", file=sys.stderr)
+                try:
+                    rumps.notification(
+                        "Phantom Calendar", "",
+                        f"Apple Calendar read failed: {_reason} — using Google Calendar",
+                    )
+                except Exception:
+                    pass
+                use_apple = False
+                msi_blocks = get_msi_time_blocks(target_date=target_date)
+                personal_events = get_personal_events(target_date=target_date)
+                if debug:
+                    print(f"[DEBUG] Fallback: MSI blocks fetched: {len(msi_blocks)}")
+        else:
+            msi_blocks = get_msi_time_blocks(target_date=target_date)
+            if debug:
+                print(f"[DEBUG] MSI blocks fetched: {len(msi_blocks)}")
+                for b in msi_blocks:
+                    print(
+                        f"[DEBUG]   {b['start'].strftime('%H:%M')} – {b['end'].strftime('%H:%M')}"
+                    )
+
+            personal_events = get_personal_events(target_date=target_date)
+            if debug:
+                print(f"[DEBUG] Personal events fetched: {len(personal_events)}")
+                for e in personal_events:
+                    loc = f" @ {e['location']}" if e.get("location") else ""
+                    print(f"[DEBUG]   {e['start'].strftime('%H:%M')} — {e['title']}{loc}")
 
         result = compute_alarm(msi_blocks, personal_events, config, debug=debug)
         # Attach raw personal events so _show_popup can pass them to _classify_personal_events
+        # (Apple path: personal_events=[] so this is a no-op; Google path: unchanged)
         result["personal_events"] = [
             e for e in personal_events if "Alarm" not in e.get("title", "")
         ]
@@ -517,8 +585,12 @@ def run_nightly_sync(app_ref=None, target_date=None) -> None:
             prep_minutes=result["prep_minutes"],
         )
 
-        # Write classifications back to Drive config (non-fatal)
-        if popup_response.get("confirmed") and popup_response.get("classifications"):
+        # Write classifications back to Drive config (non-fatal).
+        # Saved regardless of whether the alarm was confirmed — the user explicitly
+        # chose "Recurring", so the intent to remember the meeting type should not be
+        # gated on the alarm write (e.g. baseline days return confirmed=False even
+        # though the classification dialog ran and the user answered).
+        if popup_response.get("classifications"):
             try:
                 append_recurring_meetings(popup_response["classifications"], config)
                 print(

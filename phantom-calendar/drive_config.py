@@ -71,6 +71,7 @@ _DEFAULTS = {
     "meeting_type_prep": {},
     "locations": {},
     "client_overrides": {},
+    "apple_exclude_calendars": [],
 }
 
 
@@ -309,7 +310,16 @@ def parse_config(raw: str) -> dict:
         "meeting_type_prep": data.get("meeting_type_prep") or {},
         "locations": _ensure_home_location(data.get("locations") or {}),
         "client_overrides": data.get("client_overrides") or {},
+        "apple_exclude_calendars": _parse_apple_exclude(calendars),
     }
+
+
+def _parse_apple_exclude(calendars: dict) -> list[str]:
+    """Extract apple_exclude_calendars from the calendars config section."""
+    raw = calendars.get("apple_exclude_calendars")
+    if isinstance(raw, list):
+        return [str(x) for x in raw if x]
+    return []
 
 
 def _ensure_home_location(locations: dict) -> dict:
