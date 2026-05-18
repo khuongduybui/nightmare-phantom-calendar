@@ -48,16 +48,27 @@ def is_accessible() -> bool:
         if not ver_str or int(ver_str.split(".")[0]) < 14:
             return False
 
-        if _ical_guy_path() is None:
+        binary = _ical_guy_path()
+        if binary is None:
             return False
 
+        # Probe: list calendars. stdout is not a TTY (capture_output=True) so
+        # ical-guy auto-selects JSON output — do NOT pass --format json here;
+        # that flag is only supported by the `events` subcommand and causes a
+        # Swift fatalError (exit 133) on `calendars`.
         result = subprocess.run(
-            [_ical_guy_path(), "calendars", "--format", "json"],
+            [binary, "calendars"],
             capture_output=True,
             text=True,
             timeout=15,
         )
         if result.returncode != 0:
+            import sys
+            print(
+                f"[apple_calendar] ical-guy probe failed (exit {result.returncode}): "
+                f"{result.stderr.strip() or '(no stderr)'}",
+                file=sys.stderr,
+            )
             return False
 
         json.loads(result.stdout)
