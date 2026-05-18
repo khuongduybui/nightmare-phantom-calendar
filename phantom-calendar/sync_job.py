@@ -3,10 +3,11 @@
 import subprocess
 import sys
 import threading
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import rumps
 
+import apple_calendar
 import osaurus_client
 from calendar_reader import get_msi_time_blocks, get_personal_events
 from calendar_writer import run_calendar_write
@@ -438,8 +439,18 @@ def run_nightly_sync(app_ref=None, target_date=None) -> None:
             update the menu bar icon and status items.
 
     Execution order:
-        read_config → parse_config → get_msi_time_blocks → get_personal_events
+        read_config → parse_config → [Apple Calendar reads | Google Calendar reads]
         → compute_alarm → ConfirmationPopup.show() → run_calendar_write()
+
+    Read source selection (per-run, automatic):
+        If apple_calendar.is_accessible() returns True, events are read from all
+        Apple Calendars via ical-guy and merged into a unified pool (passed as
+        msi_blocks to compute_alarm with personal_events=[]). On any failure,
+        falls back to Google Calendar reads with a rumps.notification.
+        If apple_calendar.is_accessible() returns False, Google Calendar reads
+        are used silently (pre-NPC-0014 behavior).
+
+    The alarm write path (run_calendar_write) always targets Google Calendar.
 
     Protected by a module-level lock — returns immediately without running
     if a sync is already in progress (prevents double-trigger).
@@ -472,23 +483,60 @@ def run_nightly_sync(app_ref=None, target_date=None) -> None:
         if debug:
             print(f"[DEBUG] Timezone: {timezone_str}")
 
-        msi_blocks = get_msi_time_blocks(target_date=target_date)
+        use_apple = apple_calendar.is_accessible()
         if debug:
-            print(f"[DEBUG] MSI blocks fetched: {len(msi_blocks)}")
-            for b in msi_blocks:
-                print(
-                    f"[DEBUG]   {b['start'].strftime('%H:%M')} – {b['end'].strftime('%H:%M')}"
-                )
+            print(f"[DEBUG] Read source: {'Apple Calendar' if use_apple else 'Google Calendar'}")
 
-        personal_events = get_personal_events(target_date=target_date)
-        if debug:
-            print(f"[DEBUG] Personal events fetched: {len(personal_events)}")
-            for e in personal_events:
-                loc = f" @ {e['location']}" if e.get("location") else ""
-                print(f"[DEBUG]   {e['start'].strftime('%H:%M')} — {e['title']}{loc}")
+        if use_apple:
+            try:
+                _target = target_date if target_date is not None else date.today() + timedelta(days=1)
+                unified = apple_calendar.get_tomorrow_events(
+                    _target,
+                    config.get("apple_exclude_calendars", []),
+                )
+                # Filter out alarm events that may have synced from Google into Calendar.app
+                unified = [e for e in unified if "Alarm" not in e.get("title", "")]
+                msi_blocks = unified
+                personal_events = []
+                if debug:
+                    print(f"[DEBUG] Apple Calendar events fetched: {len(msi_blocks)}")
+                    for b in msi_blocks:
+                        loc = f" @ {b['location']}" if b.get("location") else ""
+                        print(f"[DEBUG]   {b['start'].strftime('%H:%M')} – {b['end'].strftime('%H:%M')} — {b['title']}{loc}")
+            except Exception as exc:
+                _reason = str(exc)
+                print(f"[sync_job] Apple Calendar read failed, falling back to Google: {_reason}", file=sys.stderr)
+                try:
+                    rumps.notification(
+                        "Phantom Calendar", "",
+                        f"Apple Calendar read failed: {_reason} — using Google Calendar",
+                    )
+                except Exception:
+                    pass
+                use_apple = False
+                msi_blocks = get_msi_time_blocks(target_date=target_date)
+                personal_events = get_personal_events(target_date=target_date)
+                if debug:
+                    print(f"[DEBUG] Fallback: MSI blocks fetched: {len(msi_blocks)}")
+        else:
+            msi_blocks = get_msi_time_blocks(target_date=target_date)
+            if debug:
+                print(f"[DEBUG] MSI blocks fetched: {len(msi_blocks)}")
+                for b in msi_blocks:
+                    print(
+                        f"[DEBUG]   {b['start'].strftime('%H:%M')} – {b['end'].strftime('%H:%M')}"
+                    )
+
+            personal_events = get_personal_events(target_date=target_date)
+            if debug:
+                print(f"[DEBUG] Personal events fetched: {len(personal_events)}")
+                for e in personal_events:
+                    loc = f" @ {e['location']}" if e.get("location") else ""
+                    print(f"[DEBUG]   {e['start'].strftime('%H:%M')} — {e['title']}{loc}")
 
         result = compute_alarm(msi_blocks, personal_events, config, debug=debug)
         # Attach raw personal events so _show_popup can pass them to _classify_personal_events
+        # (Apple path: personal_events=[] so this is a no-op; Google path: unchanged)
         result["personal_events"] = [
             e for e in personal_events if "Alarm" not in e.get("title", "")
         ]
