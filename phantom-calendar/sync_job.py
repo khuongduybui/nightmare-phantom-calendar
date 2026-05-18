@@ -1,5 +1,6 @@
 """Nightly sync pipeline — orchestrates the full alarm computation and write flow."""
 
+import os
 import subprocess
 import sys
 import threading
@@ -16,6 +17,15 @@ from drive_config import append_locations, append_recurring_meetings, parse_conf
 
 _SYNC_LOCK = threading.Lock()
 _PENDING_RUN = threading.Event()
+
+# Set PHANTOM_APPLE_DEBUG=1 to enable verbose debug logging across the sync pipeline.
+_DEBUG = os.environ.get("PHANTOM_APPLE_DEBUG", "") == "1"
+
+
+def _dbg(msg: str) -> None:
+    """Print a debug line to stderr when PHANTOM_APPLE_DEBUG=1."""
+    if _DEBUG:
+        print(f"[sync_job] {msg}", file=sys.stderr)
 
 
 def _ask_recurring_or_oneshot() -> bool:
@@ -62,14 +72,19 @@ def _classify_unknown_blocks(
         start_str = block["start"].strftime("%H:%M")
 
         # Get AI suggestion (belt-and-suspenders: client already catches all exceptions)
+        _osaurus_title = block.get("title", "Untitled")
+        _osaurus_desc = block.get("description", "")
+        _dbg(f"osaurus query (MSI): title={_osaurus_title!r} description={_osaurus_desc[:80]!r}")
         try:
             suggestion = osaurus_client.suggest_meeting_type(
-                block.get("title", "Untitled"),
-                block.get("description", ""),
+                _osaurus_title,
+                _osaurus_desc,
                 [name for name, _ in options],
             )
-        except Exception:
+        except Exception as _osa_exc:
+            _dbg(f"osaurus error (MSI): {_osa_exc}")
             suggestion = None
+        _dbg(f"osaurus suggestion (MSI): {suggestion!r}")
 
         title_str = block.get("title", "").replace('"', "'") or "Untitled"
         default_item = suggestion if suggestion else "Skip (keep default)"
@@ -263,14 +278,17 @@ def _classify_personal_events(
             continue
 
         # Get AI suggestion
+        _dbg(f"osaurus query (personal): title={title!r} description={description[:80]!r}")
         try:
             suggestion = osaurus_client.suggest_meeting_type(
                 title,
                 description,
                 [name for name, _ in options],
             )
-        except Exception:
+        except Exception as _osa_exc:
+            _dbg(f"osaurus error (personal): {_osa_exc}")
             suggestion = None
+        _dbg(f"osaurus suggestion (personal): {suggestion!r}")
 
         default_item = suggestion if suggestion else "Skip (keep default)"
         safe_title = title.replace('"', "'")
